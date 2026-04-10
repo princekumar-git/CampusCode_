@@ -82,7 +82,7 @@
         
         .nav-item i { width: 1.5rem; text-align: center; margin-right: 0.75rem; font-size: 1.1rem; flex-shrink: 0; transition: transform 0.2s ease; }
         .nav-item:hover i { transform: scale(1.1); }
-        .nav-item span { font-size: 0.875rem; }
+        .nav-item span { font-size: 0.875rem; font-weight: 500; }
     </style>
 </head>
 
@@ -139,9 +139,9 @@
                             </button>
                         </div>
 
-                        <button onclick="toggleProfile()" class="ml-2 flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-600">
-                            <div class="profile-initials-display h-9 w-9 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">--</div>
-                            <span class="profile-name-display text-sm font-medium text-gray-700 dark:text-gray-200 hidden sm:block">Loading...</span>
+                        <button id="headerProfileBtn" class="ml-2 flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-600">
+                            <div id="headerProfileInitial" class="h-9 w-9 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">--</div>
+                            <span id="headerProfileName" class="text-sm font-medium text-gray-700 dark:text-gray-200 hidden sm:block">Loading...</span>
                         </button>
                     </div>
                 </div>
@@ -346,28 +346,47 @@
         </div>
     </div>
 
-    <div id="profileOverlay" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300">
-        <div class="bg-white dark:bg-gray-800 w-[320px] rounded-3xl overflow-hidden shadow-2xl transform transition-all duration-300 scale-95 opacity-0">
-            <div class="bg-[#1e4a7a] p-6 text-center relative h-32">
-                <button onclick="toggleProfile()" class="absolute top-4 right-4 text-white/80 hover:text-white transition-colors">
-                    <i class="fas fa-times text-lg"></i>
-                </button>
-                <div class="absolute -bottom-10 left-1/2 -translate-x-1/2">
-                    <div class="profile-initials-display h-20 w-20 rounded-full border-4 border-white dark:border-gray-800 bg-[#1e4a7a] flex items-center justify-center text-white text-2xl font-bold shadow-md">--</div>
+    <div id="profileOverlay" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+        <div class="w-[340px] bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
+            <div class="bg-[#1E4A7A] dark:bg-[#0f2a4a] relative pt-8 pb-16 px-6 text-center">
+                <button id="closeProfileOverlay" class="absolute top-4 right-4 text-white/70 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+                <div class="absolute left-1/2 bottom-[-45px] -translate-x-1/2">
+                    <div class="w-24 h-24 rounded-full bg-[#1E4A7A] p-1">
+                         <div id="overlayInitial" class="w-full h-full rounded-full bg-[#1E4A7A] flex items-center justify-center text-white text-4xl font-normal border-4 border-white dark:border-gray-800">S</div>
+                    </div>
                 </div>
             </div>
-            <div class="pt-12 pb-6 px-6 text-center">
-                <h3 class="profile-name-display text-xl font-bold text-gray-800 dark:text-white">Loading...</h3>
-                <p id="overlayCollege" class="text-xs text-gray-500 flex items-center justify-center gap-1 mt-1"><i class="fas fa-university"></i> Loading...</p>
-                <p id="overlayId" class="text-xs text-gray-500 mb-3 flex items-center justify-center gap-1">Role: ...</p>
-                
-                <button id="logoutBtn" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 group mt-2 transition-all border border-transparent hover:border-red-100 dark:hover:border-red-900/50">
-                    <div class="w-8 h-8 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 flex items-center justify-center transition-transform group-hover:scale-110">
-                        <i class="fas fa-sign-out-alt"></i>
+            <div class="pt-14 pb-6 px-6 text-center">
+                <h2 id="overlayFullName" class="text-xl font-bold text-gray-900 dark:text-white">Student</h2>
+                <div class="flex flex-col items-center mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <span id="overlayCollege" class="flex items-center gap-1"><i class="fas fa-users text-xs"></i> --</span>
+                    <span id="overlayEmail">--</span>
+                </div>
+                <div class="flex justify-between mt-6 px-2">
+                    <div class="text-center">
+                        <div class="text-[10px] font-bold text-[#1E4A7A] dark:text-blue-400 uppercase tracking-wide">Solved</div>
+                        <div id="overlaySolved" class="text-xl font-bold text-gray-900 dark:text-white mt-1">0</div>
                     </div>
-                    <span class="text-sm font-medium text-red-600 dark:text-red-400">Log out</span>
-                </button>
-                <button onclick="toggleProfile()" class="mt-4 text-[10px] font-bold text-gray-400 uppercase hover:text-gray-600 transition-colors tracking-wider">Close</button>
+                    <div class="text-center border-l border-r border-gray-100 dark:border-gray-700 px-4">
+                        <div class="text-[10px] font-bold text-[#1E4A7A] dark:text-blue-400 uppercase tracking-wide">Rank</div>
+                        <div id="overlayRank" class="text-xl font-bold text-gray-900 dark:text-white mt-1">#-</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-[10px] font-bold text-[#1E4A7A] dark:text-blue-400 uppercase tracking-wide">Points</div>
+                        <div id="overlayPoints" class="text-xl font-bold text-gray-900 dark:text-white mt-1">0</div>
+                    </div>
+                </div>
+                <div class="h-px bg-gray-100 dark:bg-gray-700 my-6"></div>
+                <div class="space-y-1">
+                    <a href="/student/profile" class="nav-item"><i class="fas fa-id-card"></i><span>My Profile</span></a>
+                    <a href="/student/profile" class="nav-item"><i class="fas fa-pen"></i><span>Edit Profile</span></a>
+                    <a href="/student/report" class="nav-item"><i class="fas fa-chart-pie"></i><span>Report</span></a>
+                    <a href="/student/stats" class="nav-item"><i class="fas fa-list"></i><span>Stats</span></a>
+                    <a href="/auth/logout" class="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 group mt-2 transition-all">
+                        <div class="w-8 h-8 rounded-full bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400 flex items-center justify-center"><i class="fas fa-sign-out-alt"></i></div>
+                        <span class="text-sm font-medium text-red-600 dark:text-red-400">Log out</span>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -466,9 +485,25 @@
                     
                     document.querySelectorAll('.profile-name-display').forEach(el => el.textContent = name);
                     document.querySelectorAll('.profile-initials-display').forEach(el => el.textContent = initials);
-                    
-                    document.getElementById('overlayCollege').innerHTML = `<i class="fas fa-university"></i> ${user.collegeName || 'Not Assigned'}`;
-                    document.getElementById('overlayId').textContent = 'Role: Student';
+                    const headerProfileInitial = document.getElementById('headerProfileInitial');
+                    const headerProfileName = document.getElementById('headerProfileName');
+                    if (headerProfileInitial) headerProfileInitial.textContent = initials;
+                    if (headerProfileName) headerProfileName.textContent = name;
+
+                    const overlayInitial = document.getElementById('overlayInitial');
+                    const overlayFullName = document.getElementById('overlayFullName');
+                    const overlayCollege = document.getElementById('overlayCollege');
+                    const overlayEmail = document.getElementById('overlayEmail');
+                    const overlaySolved = document.getElementById('overlaySolved');
+                    const overlayRank = document.getElementById('overlayRank');
+                    const overlayPoints = document.getElementById('overlayPoints');
+                    if (overlayInitial) overlayInitial.textContent = (initials || 'S').charAt(0).toUpperCase();
+                    if (overlayFullName) overlayFullName.textContent = name;
+                    if (overlayCollege) overlayCollege.innerHTML = `<i class="fas fa-users text-xs"></i> ${user.collegeName || 'Not Assigned'}`;
+                    if (overlayEmail) overlayEmail.textContent = user.email || '--';
+                    if (overlaySolved) overlaySolved.textContent = String(user.problems_solved ?? user.solvedCount ?? 0);
+                    if (overlayRank) overlayRank.textContent = String(user.global_rank ?? user.rank ?? '#-');
+                    if (overlayPoints) overlayPoints.textContent = String(user.xp ?? user.points ?? 0);
                 }
             } catch (err) {
                 console.error("Error fetching settings:", err);
@@ -707,21 +742,21 @@
         // --- UI FUNCTIONS ---
         function toggleProfile() {
             const overlay = document.getElementById('profileOverlay');
-            const card = overlay.querySelector('div');
-            
-            if (overlay.classList.contains('hidden')) {
-                overlay.classList.remove('hidden');
-                setTimeout(() => {
-                    card.classList.remove('scale-95', 'opacity-0');
-                    card.classList.add('scale-100', 'opacity-100');
-                }, 10);
-            } else {
-                card.classList.remove('scale-100', 'opacity-100');
-                card.classList.add('scale-95', 'opacity-0');
-                setTimeout(() => {
-                    overlay.classList.add('hidden');
-                }, 300); 
-            }
+            if (!overlay) return;
+            overlay.classList.toggle('hidden');
+        }
+
+        const headerProfileBtn = document.getElementById('headerProfileBtn');
+        const closeProfileOverlay = document.getElementById('closeProfileOverlay');
+        const profileOverlay = document.getElementById('profileOverlay');
+        if (headerProfileBtn && profileOverlay) {
+            headerProfileBtn.addEventListener('click', () => profileOverlay.classList.remove('hidden'));
+        }
+        if (closeProfileOverlay && profileOverlay) {
+            closeProfileOverlay.addEventListener('click', () => profileOverlay.classList.add('hidden'));
+            profileOverlay.addEventListener('click', (event) => {
+                if (event.target === profileOverlay) profileOverlay.classList.add('hidden');
+            });
         }
 
         // Sidebar logic

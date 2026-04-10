@@ -23,6 +23,9 @@ module.exports = (db) => {
             if (!subject || !details) {
                 return res.status(400).json({ success: false, message: 'Subject and details are required.' });
             }
+            if (subject.length > 50) {
+                return res.status(400).json({ success: false, message: 'Subject must be 50 characters or fewer.' });
+            }
 
             const result = await dbRun(`
                 INSERT INTO support_tickets (

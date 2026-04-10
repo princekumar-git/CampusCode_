@@ -167,8 +167,9 @@
                                         <div>
                                             <label
                                                 class="block text-xs font-bold uppercase tracking-wider mb-1 text-gray-500 dark:text-gray-400">Subject</label>
-                                            <input id="ticketSubject" type="text" required placeholder="Brief summary..."
+                                            <input id="ticketSubject" type="text" required maxlength="50" oninput="if(this.value.length>50){this.value=this.value.slice(0,50)}" placeholder="Brief summary..."
                                                 class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none transition text-sm">
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Max 50 characters</p>
                                         </div>
                                     </div>
 
@@ -304,6 +305,16 @@
             const ref = document.getElementById('ticketRefId');
             const myTicketsList = document.getElementById('myTicketsList');
             const refreshMyTicketsBtn = document.getElementById('refreshMyTicketsBtn');
+            const ticketSubjectInput = document.getElementById('ticketSubject');
+
+            if (ticketSubjectInput) {
+                ticketSubjectInput.maxLength = 50;
+                ticketSubjectInput.addEventListener('input', () => {
+                    if (ticketSubjectInput.value.length > 50) {
+                        ticketSubjectInput.value = ticketSubjectInput.value.slice(0, 50);
+                    }
+                });
+            }
 
             function escapeHtml(value) {
                 return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -353,11 +364,13 @@
                 submitBtn.textContent = 'Submitting...';
                 submitBtn.disabled = true;
                 try {
+                    const subjectValue = (ticketSubjectInput ? ticketSubjectInput.value : '').trim();
+                    if (subjectValue.length > 50) throw new Error('Subject must be 50 characters or fewer.');
                     const response = await fetch('/api/support/tickets', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            subject: document.getElementById('ticketSubject').value.trim(),
+                            subject: subjectValue,
                             category: document.getElementById('ticketCategory').value,
                             details: document.getElementById('ticketDetails').value.trim()
                         })

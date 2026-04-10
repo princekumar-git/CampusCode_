@@ -912,7 +912,7 @@ module.exports = (db, transporter) => {
         try {
             const userId = req.session.user.id;
             const user = await dbGet(`
-                SELECT id, fullName, email, role, collegeName, branch, year,
+                SELECT id, fullName, email, role, collegeName, branch, year, points, solvedCount, rank,
                        notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
                        pending_college_name, college_request_status
                 FROM account_users
@@ -924,6 +924,10 @@ module.exports = (db, transporter) => {
             const parts = String(user.fullName || '').trim().split(' ').filter(Boolean);
             user.firstName = parts[0] || '';
             user.lastName = parts.slice(1).join(' ');
+            user.college = user.collegeName || '';
+            user.problems_solved = Number(user.solvedCount || 0);
+            user.global_rank = user.rank || '#-';
+            user.xp = Number(user.points || 0);
             return res.json({ success: true, user });
         } catch (error) {
             return res.status(500).json({ success: false, message: error.message });

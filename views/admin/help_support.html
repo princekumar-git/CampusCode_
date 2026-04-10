@@ -228,7 +228,8 @@
                                     <div class="grid grid-cols-1 gap-4">
                                         <div>
                                             <label class="block text-xs font-bold uppercase tracking-wider mb-1 text-gray-500 dark:text-gray-400">Subject</label>
-                                            <input type="text" id="ticketSubject" required placeholder="Brief summary..." class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none transition text-sm">
+                                            <input type="text" id="ticketSubject" required maxlength="50" placeholder="Brief summary..." class="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-400 focus:border-transparent outline-none transition text-sm">
+                                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Max 50 characters</p>
                                         </div>
                                     </div>
 
@@ -507,8 +508,18 @@
             const successState = document.getElementById('successState');
             const supportSubtext = document.getElementById('supportSubtext');
             const submitTicketBtn = document.getElementById('submitTicketBtn');
+            const ticketSubjectInput = document.getElementById('ticketSubject');
             const myTicketsList = document.getElementById('myTicketsList');
             const refreshMyTicketsBtn = document.getElementById('refreshMyTicketsBtn');
+
+            if (ticketSubjectInput) {
+                ticketSubjectInput.maxLength = 50;
+                ticketSubjectInput.addEventListener('input', () => {
+                    if (ticketSubjectInput.value.length > 50) {
+                        ticketSubjectInput.value = ticketSubjectInput.value.slice(0, 50);
+                    }
+                });
+            }
 
             function escapeHtml(value) {
                 return String(value || '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -561,9 +572,12 @@
                     submitTicketBtn.disabled = true;
 
                     // Grab values from the form using the new IDs
-                    const subject = document.getElementById('ticketSubject').value;
+                    const subject = (ticketSubjectInput ? ticketSubjectInput.value : '').trim();
                     const category = document.getElementById('ticketCategory').value;
                     const details = document.getElementById('ticketDetails').value;
+                    if (subject.length > 50) {
+                        throw new Error('Subject must be 50 characters or fewer.');
+                    }
 
                     try {
                         // Send to backend API we created in app.js

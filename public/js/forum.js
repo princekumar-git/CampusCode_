@@ -38,6 +38,8 @@ async function fetchUserContext() {
             // Keep legacy forum layout behavior; do not rebuild role shells/sidebar dynamically.
             applyLegacyForumUser();
             renderRoleSidebar();
+            bindProfileOverlay();
+            bindNotificationDropdown();
         } else {
             // Not logged in -> Redirect home/login
             window.location.href = '/';
@@ -59,6 +61,8 @@ function applyLegacyForumUser() {
         const el = document.getElementById(id);
         if (el) el.textContent = initials;
     });
+    setText('profileName', fullName);
+    setText('profileMeta', `${roleLabel}${currentUser.collegeName ? ` · ${currentUser.collegeName}` : ''}`);
     const sidebarAvatar = document.getElementById('sidebarAvatar');
     if (sidebarAvatar) sidebarAvatar.textContent = initials;
 }
@@ -71,16 +75,17 @@ function initializeTheme() {
     }
 
     const themeToggle = document.getElementById('themeToggle') || document.getElementById('themeToggleBtn');
-    if (themeToggle) {
+    if (themeToggle && themeToggle.dataset.bound !== 'true') {
+        themeToggle.dataset.bound = 'true';
         themeToggle.addEventListener('click', toggleTheme);
     }
 
     syncThemeIcon();
 
-    const sidebarBrandBtn = document.getElementById('sidebarBrandBtn');
-    if (sidebarBrandBtn && !sidebarBrandBtn.dataset.bound) {
-        sidebarBrandBtn.dataset.bound = 'true';
-        sidebarBrandBtn.addEventListener('click', toggleSidebar);
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn') || document.getElementById('sidebarBrandBtn');
+    if (sidebarToggleBtn && !sidebarToggleBtn.dataset.bound) {
+        sidebarToggleBtn.dataset.bound = 'true';
+        sidebarToggleBtn.addEventListener('click', toggleSidebar);
     }
 }
 
@@ -89,6 +94,8 @@ function toggleTheme() {
     localStorage.setItem('theme', isDark ? 'dark' : 'light');
     syncThemeIcon();
 }
+
+window.toggleTheme = toggleTheme;
 
 function syncThemeIcon() {
     const icon = document.getElementById('themeIcon') || document.querySelector('#themeToggleBtn i');
@@ -254,12 +261,14 @@ function toggleSidebar() {
     const sidebar = document.getElementById('mainSidebar');
     const sidebarLogoText = document.getElementById('sidebarLogoText');
     const headerLogoText = document.getElementById('headerLogoText');
+    const toggleIcon = document.querySelector('#sidebarToggleBtn i, #sidebarBrandBtn i');
 
     if (!sidebar) return;
 
     sidebar.classList.toggle('collapsed');
     if (sidebar.classList.contains('collapsed')) {
         sidebar.classList.replace('w-64', 'w-20');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
         if (sidebarLogoText) {
             sidebarLogoText.style.opacity = '0';
             sidebarLogoText.style.width = '0px';
@@ -270,6 +279,7 @@ function toggleSidebar() {
         }
     } else {
         sidebar.classList.replace('w-20', 'w-64');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
         if (sidebarLogoText) {
             sidebarLogoText.style.opacity = '1';
             sidebarLogoText.style.width = 'auto';
@@ -315,6 +325,25 @@ function bindProfileOverlay() {
     });
 }
 
+function bindNotificationDropdown() {
+    const notificationBtn = document.getElementById('notificationBtn');
+    const notificationDropdown = document.getElementById('notificationDropdown');
+
+    if (!notificationBtn || !notificationDropdown || notificationDropdown.dataset.bound === 'true') return;
+    notificationDropdown.dataset.bound = 'true';
+
+    notificationBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        notificationDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!notificationDropdown.contains(event.target) && !notificationBtn.contains(event.target)) {
+            notificationDropdown.classList.add('hidden');
+        }
+    });
+}
+
 function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
@@ -342,6 +371,10 @@ function initForumListing() {
     const topicSlugInput = document.getElementById('topicSlugInput');
     const topicIconInput = document.getElementById('topicIconInput');
     const topicFormMsg = document.getElementById('topicFormMsg');
+
+    if (!searchInput || !filterGlobal || !filterCollege || !sortSelect) {
+        return;
+    }
 
     const isSuperadmin = String(currentUser?.role || '').toLowerCase() === 'superadmin';
     if (addTopicBtn && isSuperadmin) addTopicBtn.classList.remove('hidden');

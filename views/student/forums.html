@@ -21,6 +21,10 @@
     };
   </script>
   <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    .dark ::-webkit-scrollbar-track { background: #111827; }
+    ::-webkit-scrollbar-thumb { background: #7ba4d0; border-radius: 3px; }
     body { font-family: 'Poppins', sans-serif; }
     .sidebar { transition: width .3s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; }
     .nav-item { transition: all .2s ease; position: relative; display: flex; align-items: center; padding: .75rem 1rem; margin-bottom: .25rem; color: #374151; border-radius: .75rem; cursor: pointer; white-space: nowrap; }
@@ -31,6 +35,7 @@
     .dark .nav-item.active { background-color: #1e4a7a; color: #fff; }
     .nav-item.active::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 60%; width: 4px; background-color: #2e5e99; border-radius: 0 4px 4px 0; }
     .nav-item i { width: 1.5rem; text-align: center; margin-right: .75rem; font-size: 1.1rem; flex-shrink: 0; }
+    .nav-item span { font-size: 0.875rem; font-weight: 500; }
     .sidebar.collapsed .nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
     .sidebar.collapsed .nav-item i { margin-right: 0; font-size: 1.25rem; }
     .sidebar.collapsed .nav-item span { display: none; }
@@ -46,25 +51,27 @@
     <aside id="mainSidebar" class="sidebar w-64 bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700 flex flex-col h-screen flex-shrink-0 transition-colors duration-200 z-50">
       <div class="p-6 flex-shrink-0 flex items-center justify-between h-[88px]">
         <h1 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2 overflow-hidden whitespace-nowrap">
-          <img src="/campuscode-logo.jpeg" alt="CampusCode" class="w-8 h-8 rounded-lg object-cover flex-shrink-0" />
+          <i class="fas fa-code text-primary-500 text-2xl flex-shrink-0"></i>
           <span id="sidebarLogoText" class="transition-all duration-300 opacity-100 w-auto">CampusCode</span>
         </h1>
-        <button id="sidebarBrandBtn" class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-primary-500 transition-colors focus:outline-none">
+        <button id="sidebarToggleBtn" class="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-primary-500 transition-colors focus:outline-none">
           <i class="fas fa-chevron-left transition-transform duration-300"></i>
         </button>
       </div>
 
-      <nav id="roleSidebarNav" class="flex-1 px-4 space-y-1 overflow-y-auto mt-2"></nav>
+      <nav id="roleSidebarNav" class="flex-1 px-4 space-y-1 overflow-y-auto mt-2">
+        <a href="/student/dashboard" class="nav-item"><i class="fas fa-home"></i><span>Home</span></a>
+        <a href="/student/problems" class="nav-item"><i class="fas fa-tasks"></i><span>Problems</span></a>
+        <a href="/student/contests" class="nav-item"><i class="fas fa-trophy"></i><span>Contests</span></a>
+        <a href="/student/forum" class="nav-item active"><i class="fas fa-comments"></i><span>Community</span></a>
+        <a href="/student/stats" class="nav-item"><i class="fas fa-list"></i><span>Stats</span></a>
+        <a href="/student/report" class="nav-item"><i class="fas fa-chart-pie"></i><span>Report</span></a>
+        <a href="/student/profile" class="nav-item"><i class="fas fa-user"></i><span>Profile</span></a>
+      </nav>
 
       <div class="p-4 space-y-1 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0 bottom-menu">
         <a id="sidebarSupportLink" href="/student/support" class="nav-item"><i class="far fa-question-circle"></i><span id="sidebarSupportLabel">Help & Support</span></a>
-        <button id="sidebarProfileBtn" class="w-full text-left flex items-center gap-3 p-3 rounded-2xl bg-gray-50 dark:bg-gray-700 mt-2 border border-gray-100 dark:border-gray-600">
-          <div id="sidebarAvatar" class="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold text-sm">U</div>
-          <div class="min-w-0">
-            <div id="sidebarName" class="text-sm font-bold text-gray-800 dark:text-white truncate leading-tight uppercase">User</div>
-            <div id="sidebarRole" class="text-[10px] text-primary-500 dark:text-primary-200 font-semibold uppercase tracking-wider">Student</div>
-          </div>
-        </button>
+        <a href="/student/settings" class="nav-item"><i class="fas fa-cog"></i><span>Settings</span></a>
       </div>
     </aside>
 

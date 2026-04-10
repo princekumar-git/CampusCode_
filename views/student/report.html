@@ -140,20 +140,17 @@
 <body class="bg-primary-50 dark:bg-gray-900 min-h-screen font-sans transition-colors duration-200">
   <div class="flex h-screen overflow-hidden">
     <div class="flex-1 overflow-y-auto">
-      <header class="bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 sticky top-0 z-50">
+      <header class="bg-white dark:bg-gray-800 shadow-sm transition-colors duration-200 sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center">
           <div class="flex-1 max-w-2xl ml-4 flex items-center gap-4">
-            <div class="flex items-center gap-3 whitespace-nowrap">
-              <img src="/campuscode-logo.jpeg" alt="CampusCode logo" class="h-9 w-9 rounded-xl object-contain bg-white p-1 shadow-sm">
-              <h1 class="text-xl font-bold text-gray-800 dark:text-white whitespace-nowrap">CampusCode</h1>
-            </div>
+            <h1 id="headerLogoText" class="text-xl font-bold text-gray-800 dark:text-white hidden transition-all duration-300 opacity-0 transform -translate-x-2 whitespace-nowrap">CampusCode</h1>
             <div class="relative flex items-center w-full">
               <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fas fa-search text-gray-400"></i></div>
-              <input type="text" class="block w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all" placeholder="Search reports, sections, metrics..." />
+              <input type="text" class="block w-full pl-10 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:ring-2 focus:ring-primary-400 focus:border-transparent transition-all" placeholder="Search problems, contests, tags..." />
             </div>
           </div>
           <div class="ml-4 flex items-center gap-3">
-            <button id="themeToggleBtn" class="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <button id="themeToggleBtn" class="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none transition-transform active:scale-95">
               <i class="fas fa-moon text-xl"></i>
             </button>
             <div class="relative">
@@ -162,7 +159,7 @@
                 <span class="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500 border-2 border-white dark:border-gray-800"></span>
               </button>
             </div>
-            <button id="headerProfileBtn" class="ml-2 flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700">
+            <button id="headerProfileBtn" class="ml-2 flex items-center gap-3 p-1 pr-3 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
               <div class="h-9 w-9 rounded-full bg-primary-500 flex items-center justify-center text-white font-bold text-sm"><%= (user.username || 'ST').slice(0,2).toUpperCase() %></div>
               <span class="text-sm font-medium text-gray-700 dark:text-gray-200 hidden sm:block"><%= user.fullName %></span>
             </button>
@@ -539,6 +536,50 @@
     closeProfileOverlay.addEventListener('click', () => profileOverlay.classList.add('hidden'));
     profileOverlay.addEventListener('click', (e) => {
       if (e.target === profileOverlay) profileOverlay.classList.add('hidden');
+    });
+  </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const root = document.documentElement;
+      const themeBtn = document.getElementById('themeToggleBtn');
+      const themeIcon = themeBtn ? themeBtn.querySelector('i') : null;
+      if (themeBtn && themeIcon) {
+        const savedTheme = localStorage.getItem('theme');
+        const useDark = savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        root.classList.toggle('dark', useDark);
+        themeIcon.className = useDark ? 'fas fa-sun text-xl' : 'fas fa-moon text-xl';
+
+        themeBtn.addEventListener('click', () => {
+          const isDark = root.classList.toggle('dark');
+          localStorage.setItem('theme', isDark ? 'dark' : 'light');
+          themeIcon.className = isDark ? 'fas fa-sun text-xl' : 'fas fa-moon text-xl';
+        });
+      }
+
+      const profileBtn = document.getElementById('headerProfileBtn');
+      const profileOverlay = document.getElementById('profileOverlay');
+      const closeProfileOverlay = document.getElementById('closeProfileOverlay');
+      if (profileBtn && profileOverlay && closeProfileOverlay) {
+        profileBtn.addEventListener('click', () => profileOverlay.classList.remove('hidden'));
+        closeProfileOverlay.addEventListener('click', () => profileOverlay.classList.add('hidden'));
+        profileOverlay.addEventListener('click', (e) => {
+          if (e.target === profileOverlay) profileOverlay.classList.add('hidden');
+        });
+      }
+
+      const notificationBtn = document.getElementById('notificationBtn');
+      const notificationDropdown = document.getElementById('notificationDropdown');
+      if (notificationBtn && notificationDropdown) {
+        notificationBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          notificationDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (e) => {
+          if (!notificationDropdown.contains(e.target) && !notificationBtn.contains(e.target)) {
+            notificationDropdown.classList.add('hidden');
+          }
+        });
+      }
     });
   </script>
 </body>

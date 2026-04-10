@@ -20,6 +20,28 @@
       }
     };
   </script>
+  <style>
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+      padding: 0.75rem;
+      border-radius: 0.75rem;
+      color: #374151;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+    .nav-item:hover { background-color: #f3f4f6; }
+    .dark .nav-item { color: #d1d5db; }
+    .dark .nav-item:hover { background-color: #374151; }
+    .nav-item i {
+      width: 1.5rem;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .nav-item span { font-size: 0.95rem; font-weight: 500; }
+  </style>
 </head>
 <body class="bg-primary-50 dark:bg-gray-900 min-h-screen font-sans transition-colors duration-200">
   <div class="min-h-screen">
@@ -33,7 +55,7 @@
           </div>
         </div>
         <div class="ml-4 flex items-center gap-3">
-          <button id="themeToggleBtn" class="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none transition-transform active:scale-95">
+          <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none transition-transform active:scale-95">
             <i id="themeIcon" class="fas fa-moon text-xl"></i>
           </button>
           <div class="relative">
@@ -117,41 +139,55 @@
   </div>
 
   <script>
-    (function () {
-      if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-      }
-      const themeIcon = document.getElementById('themeIcon');
-      if (themeIcon && document.documentElement.classList.contains('dark')) themeIcon.className = 'fas fa-sun text-xl';
-    })();
-    document.getElementById('themeToggleBtn')?.addEventListener('click', () => {
+    (function initHeaderControls() {
       const root = document.documentElement;
-      root.classList.toggle('dark');
-      localStorage.theme = root.classList.contains('dark') ? 'dark' : 'light';
+      const themeBtn = document.getElementById('themeToggleBtn');
       const themeIcon = document.getElementById('themeIcon');
-      if (themeIcon) themeIcon.className = root.classList.contains('dark') ? 'fas fa-sun text-xl' : 'fas fa-moon text-xl';
-    });
-    const notificationBtn = document.getElementById('notificationBtn');
-    const notificationDropdown = document.getElementById('notificationDropdown');
-    if (notificationBtn && notificationDropdown) {
-      notificationBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        notificationDropdown.classList.toggle('hidden');
-      });
-      document.addEventListener('click', (event) => {
-        if (!notificationDropdown.contains(event.target) && !notificationBtn.contains(event.target)) notificationDropdown.classList.add('hidden');
-      });
-    }
-    const profileOverlay = document.getElementById('profileOverlay');
-    const headerProfileBtn = document.getElementById('headerProfileBtn');
-    const closeProfileOverlayBtn = document.getElementById('closeProfileOverlay');
-    if (profileOverlay && headerProfileBtn && closeProfileOverlayBtn) {
-      headerProfileBtn.addEventListener('click', () => profileOverlay.classList.remove('hidden'));
-      closeProfileOverlayBtn.addEventListener('click', () => profileOverlay.classList.add('hidden'));
-      profileOverlay.addEventListener('click', (event) => {
-        if (event.target === profileOverlay) profileOverlay.classList.add('hidden');
-      });
-    }
+      const notificationBtn = document.getElementById('notificationBtn');
+      const notificationDropdown = document.getElementById('notificationDropdown');
+      const profileOverlay = document.getElementById('profileOverlay');
+      const headerProfileBtn = document.getElementById('headerProfileBtn');
+      const closeProfileOverlayBtn = document.getElementById('closeProfileOverlay');
+
+      function syncThemeIcon() {
+        if (!themeIcon) return;
+        themeIcon.className = root.classList.contains('dark') ? 'fas fa-sun text-xl' : 'fas fa-moon text-xl';
+      }
+
+      if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+      syncThemeIcon();
+
+      window.toggleTheme = function toggleTheme() {
+        root.classList.toggle('dark');
+        localStorage.theme = root.classList.contains('dark') ? 'dark' : 'light';
+        syncThemeIcon();
+      };
+      if (themeBtn) themeBtn.addEventListener('click', window.toggleTheme);
+
+      if (notificationBtn && notificationDropdown) {
+        notificationBtn.addEventListener('click', (event) => {
+          event.stopPropagation();
+          notificationDropdown.classList.toggle('hidden');
+        });
+        document.addEventListener('click', (event) => {
+          if (!notificationDropdown.contains(event.target) && !notificationBtn.contains(event.target)) {
+            notificationDropdown.classList.add('hidden');
+          }
+        });
+      }
+
+      if (profileOverlay && headerProfileBtn && closeProfileOverlayBtn) {
+        headerProfileBtn.addEventListener('click', () => profileOverlay.classList.remove('hidden'));
+        closeProfileOverlayBtn.addEventListener('click', () => profileOverlay.classList.add('hidden'));
+        profileOverlay.addEventListener('click', (event) => {
+          if (event.target === profileOverlay) profileOverlay.classList.add('hidden');
+        });
+      }
+    })();
 
     const contestId = <%= Number(contestId || 0) %>;
     const content = document.getElementById('content');

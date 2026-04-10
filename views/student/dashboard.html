@@ -130,7 +130,7 @@
                     </div>
 
                     <div class="ml-4 flex items-center gap-3">
-                        <button id="themeToggleBtn" class="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none transition-transform active:scale-95">
+                        <button id="themeToggleBtn" onclick="toggleTheme()" class="p-2 rounded-full text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none transition-transform active:scale-95">
                             <i class="fas fa-moon text-xl"></i>
                         </button>
                         <div class="relative">
@@ -357,18 +357,25 @@
 
       const html = document.documentElement;
       const themeBtn = document.getElementById('themeToggleBtn');
-      const themeIcon = themeBtn.querySelector('i');
+      const themeIcon = themeBtn ? themeBtn.querySelector('i') : null;
+      function syncThemeIcon() {
+        if (!themeIcon) return;
+        themeIcon.className = html.classList.contains('dark') ? 'fas fa-sun text-xl' : 'fas fa-moon text-xl';
+      }
       if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         html.classList.add('dark');
-        themeIcon.classList.replace('fa-moon', 'fa-sun');
+      } else {
+        html.classList.remove('dark');
       }
+      syncThemeIcon();
       function toggleTheme() {
         html.classList.toggle('dark');
         const isDark = html.classList.contains('dark');
         localStorage.theme = isDark ? 'dark' : 'light';
-        themeIcon.className = isDark ? 'fas fa-sun text-xl' : 'fas fa-moon text-xl';
+        syncThemeIcon();
       }
-      themeBtn.addEventListener('click', toggleTheme);
+      window.toggleTheme = toggleTheme;
+      if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
 
       const sidebar = document.getElementById('mainSidebar');
       const toggleBtn = document.getElementById('sidebarToggleBtn');
@@ -403,6 +410,6 @@
         if (event.target === profileOverlay) profileOverlay.classList.add('hidden');
       });
     </script>
-</body>
+  </body>
 </html>
 
