@@ -28,8 +28,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function setActiveProblemTab(tab) {
         if (!tab) return;
-        problemTabs.forEach(t => t.classList.remove('active', 'border-primary-500', 'text-primary-600'));
-        tab.classList.add('active', 'border-primary-500', 'text-primary-600');
+        problemTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
 
         const target = tab.dataset.tab;
         problemTabContents.forEach(content => {

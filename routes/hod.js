@@ -318,7 +318,7 @@ module.exports = (db) => {
             });
     });
 
-    // HOD: Global Teacher Search & Profile View
+    // HOD: Global Teacher Search & Profile View (Legacy JSON)
     router.get('/hod/view-profile/:id', requireRole('hod'), (req, res) => {
         const collegeName = req.session.user.collegeName;
         db.get(`SELECT id, fullName, email, role, department, mobile, post FROM account_users WHERE id = ? AND collegeName = ?`, 
@@ -327,6 +327,152 @@ module.exports = (db) => {
                 if (!row) return res.status(404).json({ success: false, error: "Teacher not found." });
                 res.json({ success: true, profile: row });
             });
+    });
+
+    // ⭐ HOD: View Detailed Student Profile Page
+    router.get('/hod/view_student', requireRole('hod'), (req, res) => {
+        res.render('hod/view_student.html', { 
+            user: req.session.user, 
+            currentPage: 'student',
+            queryId: req.query.id
+        });
+    });
+
+    // ⭐ HOD: View Detailed Faculty Profile Page
+    router.get('/hod/view_faculty', requireRole('hod'), (req, res) => {
+        res.render('hod/view_faculty.html', { 
+            user: req.session.user, 
+            currentPage: 'faculty',
+            queryId: req.query.id
+        });
+    });
+
+    // ⭐ Faculty/HOD: View Detailed Student Profile Page (Redirected from Faculty list)
+    router.get('/faculty/view_student', requireRole(['faculty', 'hos', 'hod']), (req, res) => {
+        res.render('faculty/view_student.html', { 
+            user: req.session.user, 
+            currentPage: 'student',
+            queryId: req.query.id
+        });
+    });
+
+    // ⭐ Faculty/HOD: View Detailed Faculty Profile Page (Redirected from Faculty list)
+    router.get('/faculty/view_faculty', requireRole(['faculty', 'hos', 'hod']), (req, res) => {
+        res.render('faculty/view_faculty.html', { 
+            user: req.session.user, 
+            currentPage: 'faculty',
+            queryId: req.query.id
+        });
+    });
+
+    // ⭐ HOD: Detailed Student Profile API (Replicated but isolated for HOD)
+    router.get('/hod/api/student/public-profile/:id', requireRole('hod'), (req, res) => {
+        const studentId = req.params.id;
+        const collegeName = req.session.user.collegeName;
+
+        db.get(`
+            SELECT id, fullName, email, department, branch, program, year, section, collegeName, role, status
+            FROM account_users 
+            WHERE id = ? AND collegeName = ? AND role = 'student'
+        `, [studentId, collegeName], (err, user) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+            res.json({
+                success: true,
+                student: {
+                    ...user,
+                    points: user.points || 0,
+                    rank: user.rank || 'Unranked',
+                    solvedCount: user.solvedCount || 0
+                }
+            });
+        });
+    });
+
+    // ⭐ Faculty/HOD: Detailed Student Profile API
+    router.get('/faculty/api/student/public-profile/:id', requireRole(['faculty', 'hos', 'hod']), (req, res) => {
+        const studentId = req.params.id;
+        const collegeName = req.session.user.collegeName;
+
+        db.get(`
+            SELECT id, fullName, email, department, branch, program, year, section, collegeName, role, status
+            FROM account_users 
+            WHERE id = ? AND collegeName = ? AND role = 'student'
+        `, [studentId, collegeName], (err, user) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+            res.json({
+                success: true,
+                student: {
+                    ...user,
+                    points: user.points || 0,
+                    rank: user.rank || 'Unranked',
+                    solvedCount: user.solvedCount || 0
+                }
+            });
+        });
+    });
+
+    // ⭐ HOD: Detailed Faculty Profile API (Replicated but isolated for HOD)
+    router.get('/hod/api/faculty/public-profile/:id', requireRole('hod'), (req, res) => {
+        const facultyId = req.params.id;
+        const collegeName = req.session.user.collegeName;
+
+        db.get(`SELECT id, fullName, email, department, branch, program, collegeName, role, status, is_hod 
+                FROM account_users WHERE id = ? AND collegeName = ?`, 
+        [facultyId, collegeName], (err, user) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            if (!user) return res.status(404).json({ success: false, message: "Faculty not found" });
+
+            const statsQuery = `
+                SELECT 
+                    (SELECT COUNT(*) FROM contests WHERE createdBy = ?) as totalContests,
+                    (SELECT COUNT(*) FROM problems WHERE faculty_id = ?) as totalProblems
+            `;
+
+            db.get(statsQuery, [facultyId, facultyId], (err, stats) => {
+                res.json({
+                    success: true,
+                    faculty: user,
+                    stats: {
+                        problemsCreated: stats ? stats.totalProblems : 0,
+                        activeContests: stats ? stats.totalContests : 0
+                    }
+                });
+            });
+        });
+    });
+
+    // ⭐ Faculty/HOD: Detailed Faculty Profile API
+    router.get('/faculty/api/faculty/public-profile/:id', requireRole(['faculty', 'hos', 'hod']), (req, res) => {
+        const facultyId = req.params.id;
+        const collegeName = req.session.user.collegeName;
+
+        db.get(`SELECT id, fullName, email, department, branch, program, collegeName, role, status, is_hod 
+                FROM account_users WHERE id = ? AND collegeName = ?`, 
+        [facultyId, collegeName], (err, user) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            if (!user) return res.status(404).json({ success: false, message: "Faculty not found" });
+
+            const statsQuery = `
+                SELECT 
+                    (SELECT COUNT(*) FROM contests WHERE createdBy = ?) as totalContests,
+                    (SELECT COUNT(*) FROM problems WHERE faculty_id = ?) as totalProblems
+            `;
+
+            db.get(statsQuery, [facultyId, facultyId], (err, stats) => {
+                res.json({
+                    success: true,
+                    faculty: user,
+                    stats: {
+                        problemsCreated: stats ? stats.totalProblems : 0,
+                        activeContests: stats ? stats.totalContests : 0
+                    }
+                });
+            });
+        });
     });
 
 
@@ -536,9 +682,20 @@ module.exports = (db) => {
         db.all(facultyQuery, params, (err, faculty) => {
             if (err) return res.status(500).json({ success: false, error: err.message });
             
+            // Calculate stats for dashboard cards
+            const hosCount = (faculty || []).filter(f => f.role === 'hos').length;
+            const totalAssignments = (faculty || []).reduce((acc, f) => {
+                if (!f.assignments) return acc;
+                return acc + f.assignments.split(',').length;
+            }, 0);
+
             res.render('hod/faculty.html', {
                 user: req.session.user,
                 departmentFaculty: faculty,
+                stats: {
+                    hosCount,
+                    totalAssignments
+                },
                 currentPage: 'faculty',
                 dropdownData: res.locals.dropdownData
             });

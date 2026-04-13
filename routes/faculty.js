@@ -447,6 +447,78 @@ module.exports = (db) => {
     });
 
     // ==========================================
+    // VIEW STUDENT PROFILE
+    // ==========================================
+    router.get('/view_student', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('faculty/view_student.html', { 
+            user: req.session.user, 
+            currentPage: 'student',
+            queryId: req.query.id
+        });
+    });
+
+    router.get('/view_faculty', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('faculty/view_faculty.html', { 
+            user: req.session.user, 
+            currentPage: 'faculty',
+            queryId: req.query.id
+        });
+    });
+
+    router.get('/api/student/public-profile/:id', requireRole(['faculty', 'hos', 'hod']), (req, res) => {
+        const studentId = req.params.id;
+        const collegeName = req.session.user.collegeName;
+
+        db.get(`
+            SELECT id, fullName, email, department, branch, program, year, section, collegeName, role, status
+            FROM account_users 
+            WHERE id = ? AND collegeName = ? AND role = 'student'
+        `, [studentId, collegeName], (err, user) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            if (!user) return res.status(404).json({ success: false, message: "Student not found" });
+
+            res.json({
+                success: true,
+                student: {
+                    ...user,
+                    points: user.points || 0,
+                    rank: user.rank || 'Unranked',
+                    solvedCount: user.solvedCount || 0
+                }
+            });
+        });
+    });
+
+    router.get('/api/faculty/public-profile/:id', requireRole(['faculty', 'hos', 'hod']), (req, res) => {
+        const facultyId = req.params.id;
+        const collegeName = req.session.user.collegeName;
+
+        db.get(`SELECT id, fullName, email, department, branch, program, collegeName, role, status, is_hod 
+                FROM account_users WHERE id = ? AND collegeName = ?`, 
+        [facultyId, collegeName], (err, user) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            if (!user) return res.status(404).json({ success: false, message: "Faculty not found" });
+
+            const statsQuery = `
+                SELECT 
+                    (SELECT COUNT(*) FROM contests WHERE createdBy = ?) as totalContests,
+                    (SELECT COUNT(*) FROM problems WHERE faculty_id = ?) as totalProblems
+            `;
+
+            db.get(statsQuery, [facultyId, facultyId], (err, stats) => {
+                res.json({
+                    success: true,
+                    faculty: user,
+                    stats: {
+                        problemsCreated: stats ? stats.totalProblems : 0,
+                        activeContests: stats ? stats.totalContests : 0
+                    }
+                });
+            });
+        });
+    });
+
+    // ==========================================
     // COMMUNITY
     // ==========================================
     router.get('/community', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
@@ -1116,6 +1188,48 @@ module.exports = (db) => {
             console.error('Leaderboard View Error:', error);
             res.status(500).send(error.message);
         }
+    });
+
+    // Student Detail View for Faculty
+    router.get('/view_student', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('faculty/view_student.html', { 
+            currentPage: 'student', 
+            queryId: req.query.id, 
+            user: req.session.user 
+        });
+    });
+
+    // Student Profile API for Faculty
+    router.get('/api/student/public-profile/:id', requireRole(['faculty', 'hos', 'hod']), (req, res) => {
+        const studentId = req.params.id;
+        const collegeName = req.session.user.collegeName;
+
+        db.get(`
+            SELECT id, fullName, email, department, branch, program, year, section, collegeName, role, status
+            FROM account_users 
+            WHERE id = ? AND collegeName = ? AND role = 'student'
+        `, [studentId, collegeName], (err, student) => {
+            if (err) return res.status(500).json({ success: false, message: "Database error" });
+            if (!student) return res.status(404).json({ success: false, message: "Student not found" });
+
+            // Fetch summary stats
+            db.get(`
+                SELECT 
+                    (SELECT COUNT(*) FROM submissions WHERE user_id = ? AND status = 'accepted') as solvedCount,
+                    (SELECT SUM(best_points) FROM submissions WHERE user_id = ?) as totalPoints
+                FROM account_users LIMIT 1
+            `, [studentId, studentId], (err, stats) => {
+                res.json({
+                    success: true,
+                    student: {
+                        ...student,
+                        points: stats?.totalPoints || 0,
+                        rank: 'N/A', // Rank calculation can be added if needed
+                        solvedCount: stats?.solvedCount || 0
+                    }
+                });
+            });
+        });
     });
 
     return router;

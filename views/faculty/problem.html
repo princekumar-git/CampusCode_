@@ -43,6 +43,36 @@
     </script>
 
     <style>
+        .problem-tab {
+            position: relative;
+            transition: color 0.2s ease, background-color 0.2s ease;
+        }
+
+        .problem-tab.active {
+            color: #1e4a7a;
+            background: linear-gradient(180deg, rgba(208, 225, 245, 0.55) 0%, rgba(208, 225, 245, 0.18) 100%);
+        }
+
+        .problem-tab.active::after {
+            content: "";
+            position: absolute;
+            left: 1rem;
+            right: 1rem;
+            bottom: 0;
+            height: 3px;
+            border-radius: 999px 999px 0 0;
+            background: #2e5e99;
+        }
+
+        .dark .problem-tab.active {
+            color: #ffffff;
+            background: linear-gradient(180deg, rgba(30, 74, 122, 0.7) 0%, rgba(30, 74, 122, 0.3) 100%);
+        }
+
+        .dark .problem-tab.active::after {
+            background: #60a5fa;
+        }
+
         /* Dark mode styles for Quill editor */
         .dark .ql-toolbar.ql-snow {
             background-color: #374151;
