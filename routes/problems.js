@@ -13,6 +13,19 @@ module.exports = (db) => {
     const runtimeCacheTtlMs = 60 * 1000;
     let runtimeCache = { fetchedAt: 0, runtimes: [] };
 
+    // Problem-level user interactions (bookmarks, like/dislike, star)
+    db.run(`CREATE TABLE IF NOT EXISTS problem_reactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        problem_id INTEGER NOT NULL,
+        vote_type INTEGER DEFAULT 0,
+        starred INTEGER DEFAULT 0,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, problem_id),
+        FOREIGN KEY(problem_id) REFERENCES problems(id) ON DELETE CASCADE
+    )`, () => {});
+
     // ==========================================
     // AUTH HELPERS
     // ==========================================
@@ -102,6 +115,152 @@ module.exports = (db) => {
     });
 
     // ==========================================
+    // USER BOOKMARKS + REACTIONS
+    // ==========================================
+    router.get('/bookmarks/me', requireAuth, (req, res) => {
+        const userId = req.session.user.id;
+        db.all(`SELECT problem_id FROM problem_bookmarks WHERE user_id = ? ORDER BY createdAt DESC`, [userId], (err, rows) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            return res.json({ success: true, bookmarks: (rows || []).map((r) => Number(r.problem_id)).filter((id) => Number.isInteger(id) && id > 0) });
+        });
+    });
+
+    router.post('/bookmarks', requireAuth, (req, res) => {
+        const userId = req.session.user.id;
+        const problemId = Number(req.body?.problemId);
+        if (!Number.isInteger(problemId) || problemId <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid problem id' });
+        }
+        db.run(`INSERT OR IGNORE INTO problem_bookmarks (user_id, problem_id) VALUES (?, ?)`, [userId, problemId], (err) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            return res.json({ success: true, bookmarked: true });
+        });
+    });
+
+    router.delete('/bookmarks/:problemId', requireAuth, (req, res) => {
+        const userId = req.session.user.id;
+        const problemId = Number(req.params.problemId);
+        if (!Number.isInteger(problemId) || problemId <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid problem id' });
+        }
+        db.run(`DELETE FROM problem_bookmarks WHERE user_id = ? AND problem_id = ?`, [userId, problemId], (err) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            return res.json({ success: true, bookmarked: false });
+        });
+    });
+
+    router.get('/:id/interactions', requireAuth, (req, res) => {
+        const userId = req.session.user.id;
+        const problemId = Number(req.params.id);
+        if (!Number.isInteger(problemId) || problemId <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid problem id' });
+        }
+
+        db.get(
+            `SELECT
+                COALESCE((SELECT 1 FROM problem_bookmarks pb WHERE pb.user_id = ? AND pb.problem_id = ?), 0) AS bookmarked,
+                COALESCE((SELECT vote_type FROM problem_reactions pr WHERE pr.user_id = ? AND pr.problem_id = ?), 0) AS vote_type,
+                COALESCE((SELECT starred FROM problem_reactions pr WHERE pr.user_id = ? AND pr.problem_id = ?), 0) AS starred`,
+            [userId, problemId, userId, problemId, userId, problemId],
+            (err, row) => {
+                if (err) return res.status(500).json({ success: false, error: err.message });
+                return res.json({
+                    success: true,
+                    interactions: {
+                        bookmarked: Number(row?.bookmarked || 0) === 1,
+                        voteType: Number(row?.vote_type || 0),
+                        starred: Number(row?.starred || 0) === 1
+                    }
+                });
+            }
+        );
+    });
+
+    router.post('/:id/interactions/vote', requireAuth, (req, res) => {
+        const userId = req.session.user.id;
+        const problemId = Number(req.params.id);
+        const incoming = Number(req.body?.voteType);
+        if (!Number.isInteger(problemId) || problemId <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid problem id' });
+        }
+        if (![1, -1, 0].includes(incoming)) {
+            return res.status(400).json({ success: false, message: 'voteType must be 1, -1, or 0' });
+        }
+
+        db.get(`SELECT vote_type, starred FROM problem_reactions WHERE user_id = ? AND problem_id = ?`, [userId, problemId], (err, row) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+
+            const currentVote = Number(row?.vote_type || 0);
+            const currentStar = Number(row?.starred || 0);
+            const nextVote = incoming === currentVote ? 0 : incoming;
+
+            if (!row) {
+                db.run(
+                    `INSERT INTO problem_reactions (user_id, problem_id, vote_type, starred, updatedAt) VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)`,
+                    [userId, problemId, nextVote],
+                    (insertErr) => {
+                        if (insertErr) return res.status(500).json({ success: false, error: insertErr.message });
+                        return res.json({ success: true, voteType: nextVote });
+                    }
+                );
+                return;
+            }
+
+            db.run(
+                `UPDATE problem_reactions SET vote_type = ?, updatedAt = CURRENT_TIMESTAMP WHERE user_id = ? AND problem_id = ?`,
+                [nextVote, userId, problemId],
+                (updateErr) => {
+                    if (updateErr) return res.status(500).json({ success: false, error: updateErr.message });
+                    if (nextVote === 0 && currentStar === 0) {
+                        db.run(`DELETE FROM problem_reactions WHERE user_id = ? AND problem_id = ?`, [userId, problemId], () => {});
+                    }
+                    return res.json({ success: true, voteType: nextVote });
+                }
+            );
+        });
+    });
+
+    router.post('/:id/interactions/star', requireAuth, (req, res) => {
+        const userId = req.session.user.id;
+        const problemId = Number(req.params.id);
+        const starredInput = req.body?.starred;
+        if (!Number.isInteger(problemId) || problemId <= 0) {
+            return res.status(400).json({ success: false, message: 'Invalid problem id' });
+        }
+
+        db.get(`SELECT vote_type, starred FROM problem_reactions WHERE user_id = ? AND problem_id = ?`, [userId, problemId], (err, row) => {
+            if (err) return res.status(500).json({ success: false, error: err.message });
+            const currentVote = Number(row?.vote_type || 0);
+            const currentStar = Number(row?.starred || 0) === 1;
+            const nextStar = typeof starredInput === 'boolean' ? starredInput : !currentStar;
+
+            if (!row) {
+                db.run(
+                    `INSERT INTO problem_reactions (user_id, problem_id, vote_type, starred, updatedAt) VALUES (?, ?, 0, ?, CURRENT_TIMESTAMP)`,
+                    [userId, problemId, nextStar ? 1 : 0],
+                    (insertErr) => {
+                        if (insertErr) return res.status(500).json({ success: false, error: insertErr.message });
+                        return res.json({ success: true, starred: nextStar });
+                    }
+                );
+                return;
+            }
+
+            db.run(
+                `UPDATE problem_reactions SET starred = ?, updatedAt = CURRENT_TIMESTAMP WHERE user_id = ? AND problem_id = ?`,
+                [nextStar ? 1 : 0, userId, problemId],
+                (updateErr) => {
+                    if (updateErr) return res.status(500).json({ success: false, error: updateErr.message });
+                    if (!nextStar && currentVote === 0) {
+                        db.run(`DELETE FROM problem_reactions WHERE user_id = ? AND problem_id = ?`, [userId, problemId], () => {});
+                    }
+                    return res.json({ success: true, starred: nextStar });
+                }
+            );
+        });
+    });
+
+    // ==========================================
     // 1. LIST PROBLEMS
     // ==========================================
     router.get('/list', requireAuth, (req, res) => {
@@ -111,7 +270,7 @@ module.exports = (db) => {
         const userCollege = String(req.session.user.collegeName || '').trim();
 
         let query = `
-            SELECT p.id, p.title, p.difficulty, p.tags, p.points, p.status,
+            SELECT p.id, p.title, p.difficulty, p.tags, p.points, p.status, p.created_by,
                    CASE
                        WHEN LOWER(COALESCE(u.role, '')) IN ('superadmin', 'admin') THEN 'global'
                        ELSE 'college'

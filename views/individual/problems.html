@@ -222,6 +222,13 @@
 
             <section class="flex-1">
               <div class="p-0 lg:p-0">
+                <div class="mb-5 border border-primary-100 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 overflow-hidden">
+                  <div class="flex items-center">
+                    <button id="tabAllProblems" class="px-6 py-3 text-sm font-semibold border-b-2 border-primary-600 text-primary-700 dark:text-white">All Problems</button>
+                    <button id="tabCreatedProblems" class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 dark:text-gray-300 hover:text-primary-600">Created Problems</button>
+                    <button id="tabBookmarkedProblems" class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 dark:text-gray-300 hover:text-primary-600">Bookmarked Problems</button>
+                  </div>
+                </div>
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
                   <h1 class="text-2xl font-bold text-primary-600 dark:text-white mb-4 md:mb-0">Popular Problems</h1>
                   <div class="flex flex-col sm:flex-row gap-4">
@@ -363,8 +370,11 @@
     <script>
       const state = {
         allProblems: [],
+        bookmarkedSet: new Set(),
+        currentUserId: null,
         search: "",
-        difficulty: "all"
+        difficulty: "all",
+        activeTab: "all"
       };
 
       function toTitleCase(v) {
@@ -394,13 +404,23 @@
         container.innerHTML = "";
 
         const filtered = state.allProblems.filter((p) => {
+          const byTab = state.activeTab === "bookmarked"
+            ? state.bookmarkedSet.has(Number(p.id))
+            : state.activeTab === "created"
+              ? Number(p.created_by || 0) === Number(state.currentUserId || 0)
+              : true;
           const bySearch = !state.search || String(p.title || "").toLowerCase().includes(state.search);
           const byDifficulty = state.difficulty === "all" || String(p.difficulty || "").toLowerCase() === state.difficulty;
-          return bySearch && byDifficulty;
+          return byTab && bySearch && byDifficulty;
         });
 
         if (!filtered.length) {
-          container.innerHTML = `<div class="p-6 text-sm text-gray-500 dark:text-gray-400">No global problems available right now.</div>`;
+          const emptyText = state.activeTab === "bookmarked"
+            ? "No bookmarked problems yet."
+            : state.activeTab === "created"
+              ? "No created problems found."
+              : "No global problems available right now.";
+          container.innerHTML = `<div class="p-6 text-sm text-gray-500 dark:text-gray-400">${emptyText}</div>`;
           return;
         }
 
@@ -444,12 +464,23 @@
         renderProblems();
       }
 
+      async function loadBookmarks() {
+        try {
+          const resp = await fetch('/api/problems/bookmarks/me');
+          const data = await resp.json();
+          if (!resp.ok || !data.success) return;
+          state.bookmarkedSet = new Set((data.bookmarks || []).map((x) => Number(x)).filter((x) => Number.isInteger(x) && x > 0));
+          renderProblems();
+        } catch (_) {}
+      }
+
       async function loadOverlayProfile() {
         try {
           const res = await fetch('/individual/api/profile-data');
           const data = await res.json();
           if (!data.success) return;
           const p = data.profile;
+          state.currentUserId = Number(p.user.id || 0) || null;
           document.getElementById('headerUserName').textContent = p.user.fullName || 'Individual';
           document.getElementById('headerAvatar').textContent = p.user.initials || 'I';
           document.getElementById('overlayAvatar').textContent = p.user.initials || 'I';
@@ -462,6 +493,30 @@
       }
 
       document.addEventListener("DOMContentLoaded", async () => {
+        const urlTab = String(new URLSearchParams(window.location.search).get('tab') || 'all').toLowerCase();
+        if (['all', 'created', 'bookmarked'].includes(urlTab)) state.activeTab = urlTab;
+        const tabAll = document.getElementById('tabAllProblems');
+        const tabCreated = document.getElementById('tabCreatedProblems');
+        const tabBookmarked = document.getElementById('tabBookmarkedProblems');
+        const applyTabStyles = () => {
+          const tabs = [
+            { key: 'all', el: tabAll },
+            { key: 'created', el: tabCreated },
+            { key: 'bookmarked', el: tabBookmarked }
+          ];
+          tabs.forEach(({ key, el }) => {
+            if (!el) return;
+            const active = state.activeTab === key;
+            el.className = active
+              ? 'px-6 py-3 text-sm font-semibold border-b-2 border-primary-600 text-primary-700 dark:text-white'
+              : 'px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 dark:text-gray-300 hover:text-primary-600';
+          });
+        };
+        if (tabAll) tabAll.addEventListener('click', () => { state.activeTab = 'all'; applyTabStyles(); renderProblems(); });
+        if (tabCreated) tabCreated.addEventListener('click', () => { state.activeTab = 'created'; applyTabStyles(); renderProblems(); });
+        if (tabBookmarked) tabBookmarked.addEventListener('click', () => { state.activeTab = 'bookmarked'; applyTabStyles(); renderProblems(); });
+        applyTabStyles();
+
         const searchInput = document.querySelector('header input[placeholder="Search..."]');
         if (searchInput) {
           searchInput.addEventListener("input", (e) => {
@@ -493,6 +548,7 @@
           container.innerHTML = `<div class="p-6 text-sm text-red-500">${err.message}</div>`;
         }
         await loadOverlayProfile();
+        await loadBookmarks();
 
         // --- 1. SIDEBAR TOGGLE ---
         const sidebar = document.getElementById('mainSidebar');

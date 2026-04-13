@@ -68,7 +68,12 @@
             <div class="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300">
                 <a href="/individual/problems" class="flex items-center gap-2 text-primary-600 dark:text-white font-bold text-xl">
                 <i class="fas fa-list"></i>
-                <span>Problem List</span></a>
+                <span>Back To Problem List</span></a>
+            </div>
+            <div class="hidden md:flex items-center ml-4 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <a href="/individual/problems?tab=all" class="px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">All Problems</a>
+                <a href="/individual/problems?tab=created" class="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-300 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">Created Problems</a>
+                <a href="/individual/problems?tab=bookmarked" class="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-300 bg-white dark:bg-gray-800">Bookmarked Problems</a>
             </div>
             <button class="text-gray-400 hover:text-gray-600 dark:hover:text-white"><i class="fas fa-chevron-left"></i></button>
             <button class="text-gray-400 hover:text-gray-600 dark:hover:text-white"><i class="fas fa-chevron-right"></i></button>
@@ -83,16 +88,19 @@
             <button id="runBtnTop" class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
                 <i class="fas fa-play text-xs"></i> Run
             </button>
-            <button class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm">
+            <button id="bookmarkBtnTop" class="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2">
+                <i class="far fa-bookmark"></i> Bookmark
+            </button>
+            <button id="submitBtnTop" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors shadow-sm">
                 Submit
             </button>
 
             <button id="themeToggleBtn" class="p-2 rounded-md text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                 <i class="fas fa-moon"></i>
             </button>
-            <div class="h-8 w-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold text-xs cursor-pointer">
-                JD
-            </div>
+            <button id="headerProfileBtn" class="h-8 w-8 rounded-full bg-primary-600 text-white flex items-center justify-center font-bold text-xs cursor-pointer">
+                <span id="headerProfileInitials">JD</span>
+            </button>
         </div>
     </header>
 
@@ -100,18 +108,18 @@
         
         <div class="w-1/2 flex flex-col min-w-[300px] bg-white dark:bg-gray-900">
             <div class="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-                <button class="px-4 py-2 text-sm font-medium text-primary-600 dark:text-blue-400 border-b-2 border-primary-600 dark:border-blue-400 bg-white dark:bg-gray-900">
+                <button id="descriptionTabBtn" class="px-4 py-2 text-sm font-medium text-primary-600 dark:text-blue-400 border-b-2 border-primary-600 dark:border-blue-400 bg-white dark:bg-gray-900">
                     <i class="fas fa-file-alt mr-1.5"></i> Description
                 </button>
                 <button class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
                     <i class="fas fa-flask mr-1.5"></i> Editorial
                 </button>
-                <button class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                <button id="submissionsTabBtn" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
                     <i class="fas fa-history mr-1.5"></i> Submissions
                 </button>
             </div>
 
-            <div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+            <div id="descriptionPanel" class="flex-1 overflow-y-auto p-6 custom-scrollbar">
                 <div class="flex items-center justify-between mb-4">
                     <h1 id="problemTitle" class="text-2xl font-bold text-gray-900 dark:text-white">Loading...</h1>
                     <div class="flex gap-2">
@@ -123,11 +131,22 @@
                 <div id="problemDescription" class="prose dark:prose-invert max-w-none text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                 </div>
             </div>
+            <div id="submissionsPanel" class="hidden flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">My Submissions</h2>
+                    <button id="refreshSubmissionsBtn" class="text-xs px-3 py-1.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200">
+                        Refresh
+                    </button>
+                </div>
+                <div id="submissionsList" class="space-y-3">
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Loading submissions...</div>
+                </div>
+            </div>
             
             <div class="h-12 border-t border-gray-200 dark:border-gray-700 flex items-center px-4 gap-4 bg-white dark:bg-gray-900 shrink-0">
-                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><i class="far fa-thumbs-up"></i></button>
-                <button class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><i class="far fa-thumbs-down"></i></button>
-                <button class="text-gray-400 hover:text-yellow-500 transition-colors"><i class="far fa-star"></i></button>
+                <button id="likeBtn" class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><i class="far fa-thumbs-up"></i></button>
+                <button id="dislikeBtn" class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"><i class="far fa-thumbs-down"></i></button>
+                <button id="starBtn" class="text-gray-400 hover:text-yellow-500 transition-colors"><i class="far fa-star"></i></button>
                 <button class="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-white"><i class="fas fa-share-alt"></i></button>
             </div>
         </div>
@@ -213,9 +232,50 @@
             </div>
         </div>
     </div>
+    <div id="profileOverlay" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+        <div class="w-[340px] bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden">
+            <div class="bg-[#1E4A7A] dark:bg-[#0f2a4a] relative pt-8 pb-16 px-6 text-center">
+                <button id="closeProfileOverlay" class="absolute top-4 right-4 text-white/70 hover:text-white"><i class="fas fa-times text-lg"></i></button>
+                <div class="absolute left-1/2 bottom-[-45px] -translate-x-1/2">
+                    <div class="w-24 h-24 rounded-full bg-[#1E4A7A] p-1">
+                        <div id="overlayInitials" class="w-full h-full rounded-full bg-[#1E4A7A] flex items-center justify-center text-white text-4xl font-normal border-4 border-white dark:border-gray-800">JD</div>
+                    </div>
+                </div>
+            </div>
+            <div class="pt-14 pb-6 px-6 text-center">
+                <h2 id="overlayName" class="text-xl font-bold text-gray-900 dark:text-white">Individual</h2>
+                <div class="flex flex-col items-center mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <span id="overlayMeta">ID: -</span>
+                </div>
+                <div class="flex justify-between mt-6 px-2">
+                    <div class="text-center">
+                        <div class="text-[10px] font-bold text-[#1E4A7A] dark:text-blue-400 uppercase tracking-wide">Solved</div>
+                        <div id="overlaySolved" class="text-xl font-bold text-gray-900 dark:text-white mt-1">0</div>
+                    </div>
+                    <div class="text-center border-l border-r border-gray-100 dark:border-gray-700 px-4">
+                        <div class="text-[10px] font-bold text-[#1E4A7A] dark:text-blue-400 uppercase tracking-wide">Rank</div>
+                        <div id="overlayRank" class="text-xl font-bold text-gray-900 dark:text-white mt-1">#-</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-[10px] font-bold text-[#1E4A7A] dark:text-blue-400 uppercase tracking-wide">Points</div>
+                        <div id="overlayPoints" class="text-xl font-bold text-gray-900 dark:text-white mt-1">0</div>
+                    </div>
+                </div>
+                <div class="h-px bg-gray-100 dark:bg-gray-700 my-6"></div>
+                <div class="space-y-1">
+                    <a href="/individual/profile" class="block text-sm text-primary-600 dark:text-blue-400 hover:underline">Open Profile</a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         let currentProblemId = null;
+        const interactionState = {
+            bookmarked: false,
+            voteType: 0,
+            starred: false
+        };
         const defaultSnippets = {
             python: `def solve():\n    # write your logic\n    pass\n\nif __name__ == '__main__':\n    solve()\n`,
             cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // write your logic\n    return 0;\n}\n`,
@@ -234,6 +294,101 @@
         };
 
         const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        function applyInteractionUI() {
+            const bookmarkBtnTop = document.getElementById('bookmarkBtnTop');
+            const likeBtn = document.getElementById('likeBtn');
+            const dislikeBtn = document.getElementById('dislikeBtn');
+            const starBtn = document.getElementById('starBtn');
+
+            if (bookmarkBtnTop) {
+                bookmarkBtnTop.className = interactionState.bookmarked
+                    ? 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/40 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-200 px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2'
+                    : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-white px-4 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2';
+                bookmarkBtnTop.innerHTML = interactionState.bookmarked
+                    ? '<i class="fas fa-bookmark"></i> Bookmarked'
+                    : '<i class="far fa-bookmark"></i> Bookmark';
+            }
+
+            if (likeBtn) {
+                likeBtn.className = interactionState.voteType === 1
+                    ? 'text-green-600 dark:text-green-400 transition-colors'
+                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors';
+                likeBtn.innerHTML = `<i class="${interactionState.voteType === 1 ? 'fas' : 'far'} fa-thumbs-up"></i>`;
+            }
+            if (dislikeBtn) {
+                dislikeBtn.className = interactionState.voteType === -1
+                    ? 'text-red-600 dark:text-red-400 transition-colors'
+                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors';
+                dislikeBtn.innerHTML = `<i class="${interactionState.voteType === -1 ? 'fas' : 'far'} fa-thumbs-down"></i>`;
+            }
+            if (starBtn) {
+                starBtn.className = interactionState.starred
+                    ? 'text-yellow-500 dark:text-yellow-400 transition-colors'
+                    : 'text-gray-400 hover:text-yellow-500 transition-colors';
+                starBtn.innerHTML = `<i class="${interactionState.starred ? 'fas' : 'far'} fa-star"></i>`;
+            }
+        }
+
+        async function loadInteractions() {
+            if (!currentProblemId) return;
+            try {
+                const res = await fetch(`/api/problems/${currentProblemId}/interactions`);
+                const data = await res.json();
+                if (!res.ok || !data.success || !data.interactions) return;
+                interactionState.bookmarked = Boolean(data.interactions.bookmarked);
+                interactionState.voteType = Number(data.interactions.voteType || 0);
+                interactionState.starred = Boolean(data.interactions.starred);
+                applyInteractionUI();
+            } catch (_) {}
+        }
+
+        async function toggleBookmark() {
+            if (!currentProblemId) return;
+            const nextValue = !interactionState.bookmarked;
+            try {
+                const res = await fetch(nextValue ? '/api/problems/bookmarks' : `/api/problems/bookmarks/${currentProblemId}`, {
+                    method: nextValue ? 'POST' : 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: nextValue ? JSON.stringify({ problemId: currentProblemId }) : undefined
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+                interactionState.bookmarked = nextValue;
+                applyInteractionUI();
+            } catch (_) {}
+        }
+
+        async function setVote(voteType) {
+            if (!currentProblemId) return;
+            try {
+                const res = await fetch(`/api/problems/${currentProblemId}/interactions/vote`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ voteType })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+                interactionState.voteType = Number(data.voteType || 0);
+                applyInteractionUI();
+            } catch (_) {}
+        }
+
+        async function toggleStar() {
+            if (!currentProblemId) return;
+            try {
+                const nextValue = !interactionState.starred;
+                const res = await fetch(`/api/problems/${currentProblemId}/interactions/star`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ starred: nextValue })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw new Error(data.message || 'Failed');
+                interactionState.starred = Boolean(data.starred);
+                applyInteractionUI();
+            } catch (_) {}
+        }
 
         function renderProblem(problem) {
             const titleEl = document.getElementById('problemTitle');
@@ -279,6 +434,22 @@
             document.getElementById('languageSelect').value = 'python';
             document.getElementById('codeEditor').value = defaultSnippets.python;
             await loadSubmissionCount();
+            await loadSubmissions();
+            await loadInteractions();
+        }
+
+        function formatSubmissionStatus(status) {
+            const s = String(status || '').toLowerCase();
+            if (['accepted', 'ac', 'pass'].includes(s)) return '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">Accepted</span>';
+            if (['wrong answer', 'wa'].includes(s)) return '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">Wrong Answer</span>';
+            if (['time limit exceeded', 'tle'].includes(s)) return '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300">TLE</span>';
+            return `<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">${esc(status || 'Submitted')}</span>`;
+        }
+
+        function formatSubmissionTime(value) {
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return 'N/A';
+            return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
         }
 
         async function loadSubmissionCount() {
@@ -287,6 +458,40 @@
             const data = await res.json();
             if (!data.success) return;
             document.getElementById('submissionCount').innerHTML = `<i class="far fa-thumbs-up"></i> ${Array.isArray(data.submissions) ? data.submissions.length : 0}`;
+        }
+
+        async function loadSubmissions() {
+            const list = document.getElementById('submissionsList');
+            if (!currentProblemId || !list) return;
+            list.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400">Loading submissions...</div>';
+            try {
+                const res = await fetch(`/api/problems/${currentProblemId}/submissions`);
+                const data = await res.json();
+                if (!res.ok || !data.success) throw new Error(data.message || 'Failed to load submissions');
+                const rows = Array.isArray(data.submissions) ? data.submissions : [];
+                if (!rows.length) {
+                    list.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400">No submissions yet.</div>';
+                    return;
+                }
+                list.innerHTML = rows.map((row) => `
+                    <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-800/50">
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 dark:text-gray-400">#${esc(row.id)}</span>
+                                ${formatSubmissionStatus(row.status)}
+                            </div>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">${formatSubmissionTime(row.createdAt)}</span>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Language:</span> ${esc((row.language || '').toUpperCase() || 'N/A')}
+                            <span class="mx-2 text-gray-300 dark:text-gray-600">|</span>
+                            <span class="font-medium">Points:</span> ${Number(row.points_earned || 0)}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                list.innerHTML = `<div class="text-sm text-red-500">${esc(err.message || 'Failed to load submissions')}</div>`;
+            }
         }
 
         async function runCode(buttonEl) {
@@ -407,6 +612,7 @@
                     out.textContent = `Submit failed: ${data.message || data.error || `HTTP ${res.status}`}`;
                 }
                 await loadSubmissionCount();
+                await loadSubmissions();
             } catch (e) {
                 const out = document.getElementById('outputBox');
                 out.className = 'bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 text-red-500 dark:text-red-400';
@@ -417,7 +623,87 @@
             }
         }
 
+        function bindTabs() {
+            const descriptionTabBtn = document.getElementById('descriptionTabBtn');
+            const submissionsTabBtn = document.getElementById('submissionsTabBtn');
+            const descriptionPanel = document.getElementById('descriptionPanel');
+            const submissionsPanel = document.getElementById('submissionsPanel');
+            const refreshSubmissionsBtn = document.getElementById('refreshSubmissionsBtn');
+            if (!descriptionTabBtn || !submissionsTabBtn || !descriptionPanel || !submissionsPanel) return;
+
+            const setActiveTab = (key) => {
+                const descActive = key === 'description';
+                descriptionPanel.classList.toggle('hidden', !descActive);
+                submissionsPanel.classList.toggle('hidden', descActive);
+                descriptionTabBtn.className = descActive
+                    ? 'px-4 py-2 text-sm font-medium text-primary-600 dark:text-blue-400 border-b-2 border-primary-600 dark:border-blue-400 bg-white dark:bg-gray-900'
+                    : 'px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200';
+                submissionsTabBtn.className = !descActive
+                    ? 'px-4 py-2 text-sm font-medium text-primary-600 dark:text-blue-400 border-b-2 border-primary-600 dark:border-blue-400 bg-white dark:bg-gray-900'
+                    : 'px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200';
+            };
+
+            descriptionTabBtn.addEventListener('click', () => setActiveTab('description'));
+            submissionsTabBtn.addEventListener('click', async () => {
+                setActiveTab('submissions');
+                await loadSubmissions();
+            });
+            if (refreshSubmissionsBtn) refreshSubmissionsBtn.addEventListener('click', loadSubmissions);
+        }
+
+        function initials(name) {
+            return String(name || 'U').split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || 'U';
+        }
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        }
+
+        async function loadProfileMini() {
+            try {
+                const res = await fetch('/individual/api/profile-data');
+                const data = await res.json();
+                if (!res.ok || !data.success || !data.profile || !data.profile.user) return;
+                const u = data.profile.user;
+                const i = initials(u.fullName || 'Individual');
+                setText('headerProfileInitials', i);
+                setText('overlayInitials', i);
+                setText('overlayName', u.fullName || 'Individual');
+                setText('overlayMeta', u.email || 'ID: -');
+                setText('overlaySolved', String(Number(u.solved || 0)));
+                setText('overlayRank', String(u.globalRank || '#-'));
+                setText('overlayPoints', String(Number(u.points || 0)));
+            } catch (_) {}
+        }
+
+        function bindProfileOverlay() {
+            const headerProfileBtn = document.getElementById('headerProfileBtn');
+            const profileOverlay = document.getElementById('profileOverlay');
+            const closeProfileOverlay = document.getElementById('closeProfileOverlay');
+            if (!headerProfileBtn || !profileOverlay || !closeProfileOverlay) return;
+            headerProfileBtn.addEventListener('click', () => profileOverlay.classList.remove('hidden'));
+            closeProfileOverlay.addEventListener('click', () => profileOverlay.classList.add('hidden'));
+            profileOverlay.addEventListener('click', (e) => {
+                if (e.target === profileOverlay) profileOverlay.classList.add('hidden');
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
+            bindTabs();
+            bindProfileOverlay();
+            loadProfileMini();
+            const submitTop = document.getElementById('submitBtnTop');
+            if (submitTop) submitTop.addEventListener('click', submitCode);
+            const bookmarkBtnTop = document.getElementById('bookmarkBtnTop');
+            if (bookmarkBtnTop) bookmarkBtnTop.addEventListener('click', toggleBookmark);
+            const likeBtn = document.getElementById('likeBtn');
+            if (likeBtn) likeBtn.addEventListener('click', () => setVote(1));
+            const dislikeBtn = document.getElementById('dislikeBtn');
+            if (dislikeBtn) dislikeBtn.addEventListener('click', () => setVote(-1));
+            const starBtn = document.getElementById('starBtn');
+            if (starBtn) starBtn.addEventListener('click', toggleStar);
+            applyInteractionUI();
             loadProblem().catch((e) => {
                 document.getElementById('problemDescription').innerHTML = `<p class="text-red-500">${e.message}</p>`;
             });
