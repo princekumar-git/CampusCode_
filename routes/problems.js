@@ -14,6 +14,15 @@ module.exports = (db) => {
     let runtimeCache = { fetchedAt: 0, runtimes: [] };
 
     // Problem-level user interactions (bookmarks, like/dislike, star)
+    db.run(`CREATE TABLE IF NOT EXISTS problem_user_bookmarks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        problem_id INTEGER NOT NULL,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, problem_id),
+        FOREIGN KEY(problem_id) REFERENCES problems(id) ON DELETE CASCADE
+    )`, () => {});
+
     db.run(`CREATE TABLE IF NOT EXISTS problem_reactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -119,7 +128,7 @@ module.exports = (db) => {
     // ==========================================
     router.get('/bookmarks/me', requireAuth, (req, res) => {
         const userId = req.session.user.id;
-        db.all(`SELECT problem_id FROM problem_bookmarks WHERE user_id = ? ORDER BY createdAt DESC`, [userId], (err, rows) => {
+        db.all(`SELECT problem_id FROM problem_user_bookmarks WHERE user_id = ? ORDER BY createdAt DESC`, [userId], (err, rows) => {
             if (err) return res.status(500).json({ success: false, error: err.message });
             return res.json({ success: true, bookmarks: (rows || []).map((r) => Number(r.problem_id)).filter((id) => Number.isInteger(id) && id > 0) });
         });
@@ -131,7 +140,7 @@ module.exports = (db) => {
         if (!Number.isInteger(problemId) || problemId <= 0) {
             return res.status(400).json({ success: false, message: 'Invalid problem id' });
         }
-        db.run(`INSERT OR IGNORE INTO problem_bookmarks (user_id, problem_id) VALUES (?, ?)`, [userId, problemId], (err) => {
+        db.run(`INSERT OR IGNORE INTO problem_user_bookmarks (user_id, problem_id) VALUES (?, ?)`, [userId, problemId], (err) => {
             if (err) return res.status(500).json({ success: false, error: err.message });
             return res.json({ success: true, bookmarked: true });
         });
@@ -143,7 +152,7 @@ module.exports = (db) => {
         if (!Number.isInteger(problemId) || problemId <= 0) {
             return res.status(400).json({ success: false, message: 'Invalid problem id' });
         }
-        db.run(`DELETE FROM problem_bookmarks WHERE user_id = ? AND problem_id = ?`, [userId, problemId], (err) => {
+        db.run(`DELETE FROM problem_user_bookmarks WHERE user_id = ? AND problem_id = ?`, [userId, problemId], (err) => {
             if (err) return res.status(500).json({ success: false, error: err.message });
             return res.json({ success: true, bookmarked: false });
         });
@@ -158,7 +167,7 @@ module.exports = (db) => {
 
         db.get(
             `SELECT
-                COALESCE((SELECT 1 FROM problem_bookmarks pb WHERE pb.user_id = ? AND pb.problem_id = ?), 0) AS bookmarked,
+                COALESCE((SELECT 1 FROM problem_user_bookmarks pb WHERE pb.user_id = ? AND pb.problem_id = ?), 0) AS bookmarked,
                 COALESCE((SELECT vote_type FROM problem_reactions pr WHERE pr.user_id = ? AND pr.problem_id = ?), 0) AS vote_type,
                 COALESCE((SELECT starred FROM problem_reactions pr WHERE pr.user_id = ? AND pr.problem_id = ?), 0) AS starred`,
             [userId, problemId, userId, problemId, userId, problemId],

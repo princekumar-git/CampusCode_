@@ -181,20 +181,7 @@
                   <h3 class="text-xs font-semibold text-primary-500 dark:text-gray-400 uppercase tracking-wider">Topics</h3>
                   <button class="text-xs text-primary-400 hover:text-primary-600 dark:text-blue-400">View All</button>
                 </div>
-                <div class="space-y-2">
-                  <label class="flex items-center justify-between cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-700 p-1 rounded transition-colors">
-                    <div class="flex items-center"><input type="checkbox" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Arrays</span></div>
-                    <span class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">2.3k</span>
-                  </label>
-                  <label class="flex items-center justify-between cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-700 p-1 rounded transition-colors">
-                    <div class="flex items-center"><input type="checkbox" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Strings</span></div>
-                    <span class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">1.8k</span>
-                  </label>
-                  <label class="flex items-center justify-between cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-700 p-1 rounded transition-colors">
-                    <div class="flex items-center"><input type="checkbox" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Linked List</span></div>
-                    <span class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">1.2k</span>
-                  </label>
-                </div>
+                <div id="topicsFilterList" class="space-y-2"></div>
                 <div class="mt-3 flex items-center">
                   <input type="checkbox" id="show-tag" class="mr-2" checked />
                   <label for="show-tag" class="text-sm text-primary-600 dark:text-gray-300">Show topic tags</label>
@@ -205,16 +192,16 @@
                 <h3 class="text-xs font-semibold text-primary-500 dark:text-gray-400 uppercase tracking-wider mb-3">Difficulty</h3>
                 <div class="space-y-2">
                   <label class="flex items-center justify-between cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-700 p-1 rounded transition-colors">
-                    <div class="flex items-center"><input type="checkbox" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Easy</span></div>
-                    <span class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">1.5k</span>
+                    <div class="flex items-center"><input type="checkbox" id="difficulty-easy" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Easy</span></div>
+                    <span id="difficulty-count-easy" class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">0</span>
                   </label>
                   <label class="flex items-center justify-between cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-700 p-1 rounded transition-colors">
-                    <div class="flex items-center"><input type="checkbox" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Medium</span></div>
-                    <span class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">1.2k</span>
+                    <div class="flex items-center"><input type="checkbox" id="difficulty-medium" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Medium</span></div>
+                    <span id="difficulty-count-medium" class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">0</span>
                   </label>
                   <label class="flex items-center justify-between cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-700 p-1 rounded transition-colors">
-                    <div class="flex items-center"><input type="checkbox" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Hard</span></div>
-                    <span class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">856</span>
+                    <div class="flex items-center"><input type="checkbox" id="difficulty-hard" class="mr-2" /><span class="text-sm text-primary-600 dark:text-gray-300">Hard</span></div>
+                    <span id="difficulty-count-hard" class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">0</span>
                   </label>
                 </div>
               </div>
@@ -225,7 +212,6 @@
                 <div class="mb-5 border border-primary-100 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 overflow-hidden">
                   <div class="flex items-center">
                     <button id="tabAllProblems" class="px-6 py-3 text-sm font-semibold border-b-2 border-primary-600 text-primary-700 dark:text-white">All Problems</button>
-                    <button id="tabCreatedProblems" class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 dark:text-gray-300 hover:text-primary-600">Created Problems</button>
                     <button id="tabBookmarkedProblems" class="px-6 py-3 text-sm font-semibold border-b-2 border-transparent text-gray-500 dark:text-gray-300 hover:text-primary-600">Bookmarked Problems</button>
                   </div>
                 </div>
@@ -371,7 +357,8 @@
       const state = {
         allProblems: [],
         bookmarkedSet: new Set(),
-        currentUserId: null,
+        topicFilters: new Set(),
+        showTags: true,
         search: "",
         difficulty: "all",
         activeTab: "all"
@@ -406,19 +393,17 @@
         const filtered = state.allProblems.filter((p) => {
           const byTab = state.activeTab === "bookmarked"
             ? state.bookmarkedSet.has(Number(p.id))
-            : state.activeTab === "created"
-              ? Number(p.created_by || 0) === Number(state.currentUserId || 0)
               : true;
           const bySearch = !state.search || String(p.title || "").toLowerCase().includes(state.search);
           const byDifficulty = state.difficulty === "all" || String(p.difficulty || "").toLowerCase() === state.difficulty;
-          return byTab && bySearch && byDifficulty;
+          const problemTags = parseTags(p.tags).map((t) => t.toLowerCase());
+          const byTopic = state.topicFilters.size === 0 || [...state.topicFilters].some((tag) => problemTags.includes(tag));
+          return byTab && bySearch && byDifficulty && byTopic;
         });
 
         if (!filtered.length) {
           const emptyText = state.activeTab === "bookmarked"
             ? "No bookmarked problems yet."
-            : state.activeTab === "created"
-              ? "No created problems found."
               : "No global problems available right now.";
           container.innerHTML = `<div class="p-6 text-sm text-gray-500 dark:text-gray-400">${emptyText}</div>`;
           return;
@@ -439,12 +424,17 @@
             <div class="col-span-1 flex items-center"><span class="w-2.5 h-2.5 ${statusColor} rounded-full"></span></div>
             <div class="col-span-7">
               <a data-problem-id="${problem.id}" href="/individual/problem/${problem.id}" class="font-medium text-gray-900 dark:text-white hover:text-primary-600 dark:hover:text-primary-400 block transition-colors">${problem.id}. ${problem.title}</a>
-              <div class="flex flex-wrap gap-2 mt-1">
+              <div class="flex flex-wrap gap-2 mt-1 ${state.showTags ? '' : 'hidden'}">
                 ${tags.map((topic) => `<span class="px-2 py-0.5 text-xs rounded-full bg-primary-100 dark:bg-blue-900/30 text-primary-600 dark:text-blue-300">${topic}</span>`).join("")}
               </div>
             </div>
             <div class="col-span-2 flex items-center justify-center"><span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${difficultyColor}">${difficulty}</span></div>
-            <div class="col-span-2 flex items-center justify-end"><span class="text-sm text-primary-500 dark:text-gray-400">${formatSubmissions(problem.submissions)}</span></div>
+            <div class="col-span-2 flex items-center justify-end gap-3">
+              <button data-bookmark-id="${problem.id}" class="text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                <i class="${state.bookmarkedSet.has(Number(problem.id)) ? 'fas text-primary-600 dark:text-primary-400' : 'far'} fa-bookmark"></i>
+              </button>
+              <span class="text-sm text-primary-500 dark:text-gray-400">${formatSubmissions(problem.submissions)}</span>
+            </div>
           `;
           container.appendChild(problemElement);
           const link = problemElement.querySelector('a[data-problem-id]');
@@ -453,7 +443,70 @@
               localStorage.setItem('individual_last_problem_id', String(problem.id));
             });
           }
+          const bookmarkBtn = problemElement.querySelector('[data-bookmark-id]');
+          if (bookmarkBtn) {
+            bookmarkBtn.addEventListener('click', async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const pid = Number(bookmarkBtn.getAttribute('data-bookmark-id'));
+              const isBookmarked = state.bookmarkedSet.has(pid);
+              try {
+                const res = await fetch(isBookmarked ? `/api/problems/bookmarks/${pid}` : '/api/problems/bookmarks', {
+                  method: isBookmarked ? 'DELETE' : 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: isBookmarked ? undefined : JSON.stringify({ problemId: pid })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) return;
+                if (isBookmarked) state.bookmarkedSet.delete(pid); else state.bookmarkedSet.add(pid);
+                renderProblems();
+              } catch (_) {}
+            });
+          }
         });
+      }
+
+      function updateDynamicFilterCounts() {
+        const easyCountEl = document.getElementById('difficulty-count-easy');
+        const mediumCountEl = document.getElementById('difficulty-count-medium');
+        const hardCountEl = document.getElementById('difficulty-count-hard');
+        const counts = { easy: 0, medium: 0, hard: 0 };
+        const topicCounts = new Map();
+
+        state.allProblems.forEach((p) => {
+          const d = String(p.difficulty || '').toLowerCase();
+          if (Object.prototype.hasOwnProperty.call(counts, d)) counts[d] += 1;
+          parseTags(p.tags).forEach((tag) => {
+            const key = String(tag || '').trim();
+            if (!key) return;
+            topicCounts.set(key, (topicCounts.get(key) || 0) + 1);
+          });
+        });
+
+        if (easyCountEl) easyCountEl.textContent = String(counts.easy);
+        if (mediumCountEl) mediumCountEl.textContent = String(counts.medium);
+        if (hardCountEl) hardCountEl.textContent = String(counts.hard);
+
+        const topicsFilterList = document.getElementById('topicsFilterList');
+        if (topicsFilterList) {
+          const topTopics = [...topicCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+          topicsFilterList.innerHTML = topTopics.map(([tag, count]) => `
+            <label class="flex items-center justify-between cursor-pointer hover:bg-primary-50 dark:hover:bg-gray-700 p-1 rounded transition-colors">
+              <div class="flex items-center"><input type="checkbox" data-topic="${esc(tag).toLowerCase()}" class="mr-2 topic-filter-checkbox" ${state.topicFilters.has(String(tag).toLowerCase()) ? 'checked' : ''} /><span class="text-sm text-primary-600 dark:text-gray-300">${esc(tag)}</span></div>
+              <span class="text-xs text-primary-500 bg-primary-50 dark:bg-gray-700 dark:text-gray-400 px-2 py-0.5 rounded-full">${count}</span>
+            </label>
+          `).join('') || `<div class="text-sm text-gray-500 dark:text-gray-400">No topics found.</div>`;
+
+          topicsFilterList.querySelectorAll('.topic-filter-checkbox').forEach((cb) => {
+            cb.addEventListener('change', () => {
+              const tag = String(cb.getAttribute('data-topic') || '');
+              if (!tag) return;
+              if (cb.checked) state.topicFilters.add(tag);
+              else state.topicFilters.delete(tag);
+              renderProblems();
+            });
+          });
+        }
       }
 
       async function loadProblems() {
@@ -461,6 +514,7 @@
         const data = await resp.json();
         if (!data.success) throw new Error(data.error || "Failed to load problems");
         state.allProblems = Array.isArray(data.problems) ? data.problems : [];
+        updateDynamicFilterCounts();
         renderProblems();
       }
 
@@ -480,7 +534,6 @@
           const data = await res.json();
           if (!data.success) return;
           const p = data.profile;
-          state.currentUserId = Number(p.user.id || 0) || null;
           document.getElementById('headerUserName').textContent = p.user.fullName || 'Individual';
           document.getElementById('headerAvatar').textContent = p.user.initials || 'I';
           document.getElementById('overlayAvatar').textContent = p.user.initials || 'I';
@@ -494,14 +547,12 @@
 
       document.addEventListener("DOMContentLoaded", async () => {
         const urlTab = String(new URLSearchParams(window.location.search).get('tab') || 'all').toLowerCase();
-        if (['all', 'created', 'bookmarked'].includes(urlTab)) state.activeTab = urlTab;
+        if (['all', 'bookmarked'].includes(urlTab)) state.activeTab = urlTab;
         const tabAll = document.getElementById('tabAllProblems');
-        const tabCreated = document.getElementById('tabCreatedProblems');
         const tabBookmarked = document.getElementById('tabBookmarkedProblems');
         const applyTabStyles = () => {
           const tabs = [
             { key: 'all', el: tabAll },
-            { key: 'created', el: tabCreated },
             { key: 'bookmarked', el: tabBookmarked }
           ];
           tabs.forEach(({ key, el }) => {
@@ -513,7 +564,6 @@
           });
         };
         if (tabAll) tabAll.addEventListener('click', () => { state.activeTab = 'all'; applyTabStyles(); renderProblems(); });
-        if (tabCreated) tabCreated.addEventListener('click', () => { state.activeTab = 'created'; applyTabStyles(); renderProblems(); });
         if (tabBookmarked) tabBookmarked.addEventListener('click', () => { state.activeTab = 'bookmarked'; applyTabStyles(); renderProblems(); });
         applyTabStyles();
 
@@ -524,9 +574,11 @@
             renderProblems();
           });
         }
-        const difficultyChecks = Array.from(document.querySelectorAll('h3'))
-          .find((h) => h.textContent.trim().toLowerCase() === "difficulty")
-          ?.parentElement?.querySelectorAll('input[type="checkbox"]');
+        const difficultyChecks = [
+          document.getElementById('difficulty-easy'),
+          document.getElementById('difficulty-medium'),
+          document.getElementById('difficulty-hard')
+        ].filter(Boolean);
         if (difficultyChecks && difficultyChecks.length >= 3) {
           const labels = ["easy", "medium", "hard"];
           difficultyChecks.forEach((cb, idx) => {
@@ -539,6 +591,13 @@
               }
               renderProblems();
             });
+          });
+        }
+        const showTagInput = document.getElementById('show-tag');
+        if (showTagInput) {
+          showTagInput.addEventListener('change', () => {
+            state.showTags = !!showTagInput.checked;
+            renderProblems();
           });
         }
         try {
