@@ -607,7 +607,12 @@
                 } else {
                     const out = document.getElementById('outputBox');
                     out.className = 'bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 text-red-500 dark:text-red-400';
-                    out.textContent = `Submit failed: ${data.message || data.error || `HTTP ${res.status}`}`;
+                    if (data && data.success) {
+                        const statusLabel = String(data.status || 'failed').replace(/_/g, ' ');
+                        out.textContent = `Result: ${statusLabel.toUpperCase()} (${Number(data.passed || 0)}/${Number(data.total || 0)})`;
+                    } else {
+                        out.textContent = `Submit failed: ${data.message || data.error || `HTTP ${res.status}`}`;
+                    }
                 }
                 await loadSubmissionCount();
                 await loadSubmissions();
