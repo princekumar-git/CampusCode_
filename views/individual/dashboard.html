@@ -217,11 +217,15 @@
                                     <p id="globalRankValue" class="text-3xl font-bold text-primary-600 dark:text-blue-400">#-</p>
                                     <p id="topPercentValue" class="text-sm text-gray-500 dark:text-gray-400 mt-1">Top 100%</p>
                                 </div>
+                                <div class="text-right flex flex-col items-end gap-2">
+                                    <span id="globalClassBadge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-700 dark:bg-blue-900/40 dark:text-blue-300">Class E</span>
+                                    <span id="upcomingClassBadge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Upcoming D</span>
+                                </div>
                             </div>
                         </div>
                         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
                             <div class="flex justify-between items-center mb-2">
-                                <p id="levelLabel" class="text-sm font-medium text-gray-700 dark:text-gray-300">Level 1</p>
+                                <p id="levelLabel" class="text-sm font-medium text-gray-700 dark:text-gray-300">Class E</p>
                                 <p id="xpLabel" class="text-sm font-medium text-primary-600 dark:text-blue-400">0/500 XP</p>
                             </div>
                             <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
@@ -660,6 +664,17 @@
                 if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 === 0 ? 0 : 1)}k`;
                 return String(n);
             };
+            const levelToClass = (levelValue) => {
+                const level = Math.max(1, Number(levelValue || 1));
+                const ladder = ['E', 'D', 'C', 'B', 'A', 'S'];
+                return ladder[Math.min(level - 1, ladder.length - 1)];
+            };
+            const nextClass = (className) => {
+                const ladder = ['E', 'D', 'C', 'B', 'A', 'S'];
+                const idx = ladder.indexOf(String(className || 'E').toUpperCase());
+                if (idx < 0) return 'D';
+                return ladder[Math.min(idx + 1, ladder.length - 1)];
+            };
 
             async function loadDashboardData() {
                 try {
@@ -673,6 +688,8 @@
                     const streakCount = document.getElementById('streakCount');
                     const globalRankValue = document.getElementById('globalRankValue');
                     const topPercentValue = document.getElementById('topPercentValue');
+                    const globalClassBadge = document.getElementById('globalClassBadge');
+                    const upcomingClassBadge = document.getElementById('upcomingClassBadge');
                     const levelLabel = document.getElementById('levelLabel');
                     const xpLabel = document.getElementById('xpLabel');
                     const xpProgressBar = document.getElementById('xpProgressBar');
@@ -684,7 +701,10 @@
                     if (streakCount) streakCount.textContent = `${Number(d.streakDays || 0)} days`;
                     if (globalRankValue) globalRankValue.textContent = d.user.globalRank || '#-';
                     if (topPercentValue) topPercentValue.textContent = d.user.topPercent || 'Top 100%';
-                    if (levelLabel) levelLabel.textContent = `Level ${Number(d.level || 1)}`;
+                    const userClass = levelToClass(d.level);
+                    if (globalClassBadge) globalClassBadge.textContent = `Class ${userClass}`;
+                    if (upcomingClassBadge) upcomingClassBadge.textContent = `Upcoming ${nextClass(userClass)}`;
+                    if (levelLabel) levelLabel.textContent = `Class ${userClass}`;
                     if (xpLabel) xpLabel.textContent = `${Number(d.levelCurrentXp || 0)}/${Number(d.levelTargetXp || 500)} XP`;
                     if (xpProgressBar) xpProgressBar.style.width = `${Math.max(0, Math.min(100, Number(d.levelProgress || 0)))}%`;
                     if (xpToNext) xpToNext.textContent = `${Number(d.xpToNext || 0)} XP to next level`;

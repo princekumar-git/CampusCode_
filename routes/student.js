@@ -9,6 +9,7 @@ module.exports = (db, transporter) => {
     const router = express.Router();
 const RANK_ORDER = ['E', 'D', 'C', 'B', 'A', 'S'];
 const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
+    let profileColumnsEnsured = false;
 
     const dbGet = (query, params = []) => new Promise((resolve, reject) => {
         db.get(query, params, (err, row) => err ? reject(err) : resolve(row));
@@ -22,6 +23,18 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
             resolve(this);
         });
     });
+    const ensureProfileColumns = async () => {
+        if (profileColumnsEnsured) return;
+        await Promise.allSettled([
+            dbRun(`ALTER TABLE users ADD COLUMN github_link TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE users ADD COLUMN location TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE student ADD COLUMN github_link TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE student ADD COLUMN location TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE faculty ADD COLUMN github_link TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE faculty ADD COLUMN location TEXT DEFAULT ''`)
+        ]);
+        profileColumnsEnsured = true;
+    };
 
     const getRankIndex = (rankClass) => RANK_ORDER.indexOf(String(rankClass || '').toUpperCase());
     const normalizeRankClass = (value) => {
@@ -373,7 +386,9 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
             section: userRow?.section || sessionUser.section || '',
             branch: userRow?.branch || sessionUser.branch || '',
             program: userRow?.program || sessionUser.program || '',
-            department: sessionUser.department || ''
+            department: sessionUser.department || '',
+            github_link: userRow?.github_link || sessionUser.github_link || '',
+            location: userRow?.location || sessionUser.location || ''
         };
     };
 
@@ -703,7 +718,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
     router.get('/profile', requireRole('student'), async (req, res) => {
         try {
             const userRow = await dbGet(`
-                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank
+                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location
                 FROM account_users
                 WHERE id = ?
             `, [req.session.user.id]);
@@ -720,7 +735,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
         const userId = sessionUser.id;
         try {
             const [userRow, submissions, acceptedTagRows] = await Promise.all([
-                dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank FROM account_users WHERE id = ?`, [userId]),
+                dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location FROM account_users WHERE id = ?`, [userId]),
                 dbAll(`
                     SELECT s.status, s.language, s.createdAt, p.difficulty, p.tags
                     FROM submissions s
@@ -780,7 +795,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
 
     router.get('/support', requireRole('student'), async (req, res) => {
         try {
-            const userRow = await dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank FROM account_users WHERE id = ?`, [req.session.user.id]);
+            const userRow = await dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location FROM account_users WHERE id = ?`, [req.session.user.id]);
             const user = await buildDisplayUser(req.session.user, userRow);
             res.render('student/support.html', { user, currentPage: 'support' });
         } catch (error) {
@@ -791,7 +806,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
 
     router.get('/forum', requireRole('student'), async (req, res) => {
         try {
-            const userRow = await dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank FROM account_users WHERE id = ?`, [req.session.user.id]);
+            const userRow = await dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location FROM account_users WHERE id = ?`, [req.session.user.id]);
             const user = await buildDisplayUser(req.session.user, userRow);
             res.render('student/forum.html', { user, currentPage: 'community' });
         } catch (error) {
@@ -815,7 +830,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
             const sessionUser = req.session.user;
             const userId = sessionUser.id;
             const [userRow, solvedDifficultyCounts] = await Promise.all([
-                dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank FROM account_users WHERE id = ?`, [userId]),
+                dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location FROM account_users WHERE id = ?`, [userId]),
                 getStudentDifficultyCounts(userId)
             ]);
             const { displayUser } = await buildContestVisibilityData(sessionUser, userRow, solvedDifficultyCounts);
@@ -831,7 +846,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
             const sessionUser = req.session.user;
             const userId = sessionUser.id;
             const [userRow, solvedDifficultyCounts] = await Promise.all([
-                dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank FROM account_users WHERE id = ?`, [userId]),
+                dbGet(`SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location FROM account_users WHERE id = ?`, [userId]),
                 getStudentDifficultyCounts(userId)
             ]);
             const displayUser = await buildDisplayUser(sessionUser, userRow, solvedDifficultyCounts);
@@ -847,6 +862,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
     });
 
     router.post('/profile', requireRole('student'), async (req, res) => {
+        await ensureProfileColumns();
         const userId = req.session.user.id;
         const firstName = String(req.body.first_name || '').trim();
         const lastName = String(req.body.last_name || '').trim();
@@ -856,11 +872,13 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
         const program = String(req.body.program || '').trim();
         const year = String(req.body.year || '').trim();
         const section = String(req.body.section || '').trim();
+        const location = String(req.body.location || '').trim();
+        const githubLink = String(req.body.github_link || '').trim();
         const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
 
         const renderProfileWithMessage = async (error, success) => {
             const userRow = await dbGet(`
-                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank
+                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location
                 FROM account_users
                 WHERE id = ?
             `, [userId]);
@@ -871,6 +889,8 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
             if (program) user.program = program;
             if (year) user.year = year;
             if (section) user.section = section;
+            if (location) user.location = location;
+            if (githubLink) user.github_link = githubLink;
             if (firstName) user.first_name = firstName;
             if (lastName || lastName === '') user.last_name = lastName;
             if (fullName) user.fullName = fullName;
@@ -889,9 +909,9 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
 
             await dbRun(`
                 UPDATE account_users
-                SET fullName = ?, email = ?, collegeName = ?, branch = ?, program = ?, year = ?, section = ?
+                SET fullName = ?, email = ?, collegeName = ?, branch = ?, program = ?, year = ?, section = ?, location = ?, github_link = ?
                 WHERE id = ?
-            `, [fullName, email, college, branch, program, year, section, userId]);
+            `, [fullName, email, college, branch, program, year, section, location, githubLink, userId]);
 
             req.session.user.fullName = fullName;
             req.session.user.name = fullName;
@@ -901,9 +921,11 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
             req.session.user.program = program;
             req.session.user.year = year;
             req.session.user.section = section;
+            req.session.user.location = location;
+            req.session.user.github_link = githubLink;
 
             const userRow = await dbGet(`
-                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank
+                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location
                 FROM account_users
                 WHERE id = ?
             `, [userId]);
@@ -923,7 +945,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
         try {
             if (!confirm || confirm !== currentName) {
                 const userRow = await dbGet(`
-                    SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank
+                    SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location
                     FROM account_users
                     WHERE id = ?
                 `, [userId]);
@@ -937,7 +959,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
         } catch (error) {
             console.error('Student delete account failed:', error);
             const userRow = await dbGet(`
-                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank
+                SELECT id, fullName, email, collegeName, department, branch, program, year, section, points, solvedCount, rank, github_link, location
                 FROM account_users
                 WHERE id = ?
             `, [userId]);
@@ -959,11 +981,12 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
 
     router.get('/api/profile', requireRole('student'), async (req, res) => {
         try {
+            await ensureProfileColumns();
             const userId = req.session.user.id;
             const user = await dbGet(`
                 SELECT id, fullName, email, role, collegeName, branch, year, points, solvedCount, rank,
                        notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
-                       pending_college_name, college_request_status
+                       pending_college_name, college_request_status, github_link, location
                 FROM account_users
                 WHERE id = ?
             `, [userId]);
@@ -977,6 +1000,8 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
             user.problems_solved = Number(user.solvedCount || 0);
             user.global_rank = user.rank || '#-';
             user.xp = Number(user.points || 0);
+            user.github_link = user.github_link || '';
+            user.location = user.location || '';
             return res.json({ success: true, user });
         } catch (error) {
             return res.status(500).json({ success: false, message: error.message });
@@ -1353,3 +1378,4 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
 
     return router;
 };
+

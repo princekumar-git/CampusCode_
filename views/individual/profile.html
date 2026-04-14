@@ -549,7 +549,39 @@
         if (closeEditModal) closeEditModal.addEventListener('click', closeModal);
         if (cancelEditBtn) cancelEditBtn.addEventListener('click', closeModal);
         editProfileModal.addEventListener('click', (e) => { if (e.target === editProfileModal) closeModal(); });
-        if (editProfileForm) editProfileForm.addEventListener('submit', (e) => { e.preventDefault(); closeModal(); alert('Profile updated successfully!'); });
+        if (editProfileForm) editProfileForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const firstName = String(document.getElementById('firstName')?.value || '').trim();
+          const lastName = String(document.getElementById('lastName')?.value || '').trim();
+          const email = String(document.getElementById('email')?.value || '').trim();
+          const city = String(document.getElementById('city')?.value || '').trim();
+          const state = String(document.getElementById('state')?.value || '').trim();
+          const github = String(document.getElementById('github')?.value || '').trim();
+          const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+          const location = [city, state].filter(Boolean).join(', ');
+
+          if (!fullName || !email) {
+            alert('Full name and email are required.');
+            return;
+          }
+
+          try {
+            const resp = await fetch('/individual/api/profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ fullName, email, githubLink: github, location })
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok || !data.success) {
+              alert(data.error || 'Failed to update profile.');
+              return;
+            }
+            closeModal();
+            window.location.reload();
+          } catch (_) {
+            alert('Failed to update profile.');
+          }
+        });
       }
 
       // Dynamic data
@@ -581,9 +613,14 @@
           setText('headerProfileName', name);
           setText('displayName', name);
           setText('displayUsername', `@${String(name).toLowerCase().replace(/\s+/g,'_')}`);
+          const locationText = String(u.location || '').trim();
+          const githubText = String(u.githubLink || '').trim();
+          const locationParts = locationText ? locationText.split(',').map(x => x.trim()).filter(Boolean) : [];
+          const cityText = locationParts.length ? locationParts[0] : '';
+          const stateText = locationParts.length > 1 ? locationParts.slice(1).join(', ') : '';
           setText('displayInstitution', 'Independent');
-          setText('displayLocation', 'Global');
-          setText('displayGithub', 'Not linked');
+          setText('displayLocation', locationText || 'Global');
+          setText('displayGithub', githubText || 'Not linked');
           setText('rankBadge', `Rank ${u.globalRank || '#-'}`);
           setText('memberBadge', (u.points || 0) >= 1000 ? 'Gold Member' : 'Member');
 
@@ -650,9 +687,9 @@
           if (username) username.value = String(name).toLowerCase().replace(/\s+/g, '_');
           if (email) email.value = u.email || '';
           if (institution) institution.value = 'Independent';
-          if (city) city.value = 'Global';
-          if (state) state.value = 'Remote';
-          if (github) github.value = '';
+          if (city) city.value = cityText || 'Global';
+          if (state) state.value = stateText || 'Remote';
+          if (github) github.value = githubText;
         }
       } catch (e) {
         console.error('Failed to load individual profile data', e);

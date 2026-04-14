@@ -5,12 +5,32 @@ const { requireRole } = require('../middleware/auth');
 module.exports = (db) => {
     const router = express.Router();
     const requireIndividual = requireRole('individual');
+    let profileColumnsEnsured = false;
     const dbGet = (query, params = []) => new Promise((resolve, reject) => {
         db.get(query, params, (err, row) => err ? reject(err) : resolve(row));
     });
     const dbAll = (query, params = []) => new Promise((resolve, reject) => {
         db.all(query, params, (err, rows) => err ? reject(err) : resolve(rows));
     });
+    const dbRun = (query, params = []) => new Promise((resolve, reject) => {
+        db.run(query, params, function (err) {
+            if (err) return reject(err);
+            resolve(this);
+        });
+    });
+
+    const ensureProfileColumns = async () => {
+        if (profileColumnsEnsured) return;
+        await Promise.allSettled([
+            dbRun(`ALTER TABLE users ADD COLUMN github_link TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE users ADD COLUMN location TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE student ADD COLUMN github_link TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE student ADD COLUMN location TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE faculty ADD COLUMN github_link TEXT DEFAULT ''`),
+            dbRun(`ALTER TABLE faculty ADD COLUMN location TEXT DEFAULT ''`)
+        ]);
+        profileColumnsEnsured = true;
+    };
 
     const serve = (file) => (req, res) =>
         res.sendFile(path.join(__dirname, '../views/individual', file));
@@ -91,6 +111,29 @@ module.exports = (db) => {
             const globalRank = Number(globalHigher?.cnt || 0) + 1;
             const total = Math.max(1, Number(totalUsers?.cnt || 1));
             const topPercent = Math.max(1, Math.round((1 - ((globalRank - 1) / total)) * 100));
+
+            const weeklyPointsRow = await dbGet(`
+                SELECT COALESCE(SUM(points_earned), 0) AS pts
+                FROM submissions
+                WHERE user_id = ?
+                  AND LOWER(COALESCE(status, '')) IN ('accepted', 'ac', 'pass')
+                  AND DATE(createdAt) >= DATE('now', '-6 days')
+            `, [userId]);
+            const weeklyPoints = Number(weeklyPointsRow?.pts || 0);
+            const weeklyHigherRow = await dbGet(`
+                SELECT COUNT(*) AS cnt
+                FROM account_users u
+                LEFT JOIN (
+                    SELECT user_id, COALESCE(SUM(points_earned), 0) AS weekly_points
+                    FROM submissions
+                    WHERE LOWER(COALESCE(status, '')) IN ('accepted', 'ac', 'pass')
+                      AND DATE(createdAt) >= DATE('now', '-6 days')
+                    GROUP BY user_id
+                ) s ON s.user_id = u.id
+                WHERE LOWER(COALESCE(u.role, '')) IN ('student', 'individual')
+                  AND COALESCE(s.weekly_points, 0) > ?
+            `, [weeklyPoints]);
+            const weeklyHighRank = Number(weeklyHigherRow?.cnt || 0) + 1;
 
             const acceptedRows = await dbAll(`
                 SELECT DATE(createdAt) AS d
@@ -183,6 +226,7 @@ module.exports = (db) => {
                         globalRank: `#${globalRank}`,
                         topPercent: `Top ${topPercent}%`
                     },
+                    weeklyHighRank: `#${weeklyHighRank}`,
                     streakDays,
                     level,
                     levelCurrentXp: points,
@@ -324,13 +368,14 @@ module.exports = (db) => {
 
     router.get('/api/profile-data', requireIndividual, async (req, res) => {
         try {
+            await ensureProfileColumns();
             const userId = Number(req.session?.user?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
 
             const user = await dbGet(`
-                SELECT id, fullName, email, points, solvedCount, rank, role
+                SELECT id, fullName, email, points, solvedCount, rank, role, github_link, location
                 FROM account_users
                 WHERE id = ?
             `, [userId]);
@@ -409,6 +454,8 @@ module.exports = (db) => {
                         id: user.id,
                         fullName: user.fullName || 'Individual',
                         email: user.email || '',
+                        githubLink: user.github_link || '',
+                        location: user.location || '',
                         initials,
                         points,
                         solved,
@@ -431,6 +478,54 @@ module.exports = (db) => {
         } catch (error) {
             console.error('Individual profile data error:', error);
             return res.status(500).json({ success: false, error: 'Failed to load profile data' });
+        }
+    });
+
+    router.post('/api/profile', requireIndividual, async (req, res) => {
+        try {
+            await ensureProfileColumns();
+            const userId = Number(req.session?.user?.id);
+            if (!Number.isInteger(userId) || userId <= 0) {
+                return res.status(401).json({ success: false, error: 'Unauthorized' });
+            }
+
+            const fullName = String(req.body?.fullName || '').trim();
+            const email = String(req.body?.email || '').trim();
+            const githubLink = String(req.body?.githubLink || '').trim();
+            const location = String(req.body?.location || '').trim();
+
+            if (!fullName || !email) {
+                return res.status(400).json({ success: false, error: 'Full name and email are required' });
+            }
+
+            const emailOwner = await dbGet(`SELECT id FROM account_users WHERE LOWER(email) = LOWER(?) AND id != ?`, [email, userId]);
+            if (emailOwner) {
+                return res.status(409).json({ success: false, error: 'Email already in use' });
+            }
+
+            await new Promise((resolve, reject) => {
+                db.run(`
+                    UPDATE account_users
+                    SET fullName = ?, email = ?, github_link = ?, location = ?
+                    WHERE id = ?
+                `, [fullName, email, githubLink, location, userId], function (err) {
+                    if (err) return reject(err);
+                    resolve();
+                });
+            });
+
+            if (req.session?.user) {
+                req.session.user.fullName = fullName;
+                req.session.user.name = fullName;
+                req.session.user.email = email;
+                req.session.user.location = location;
+                req.session.user.github_link = githubLink;
+            }
+
+            return res.json({ success: true, message: 'Profile updated successfully' });
+        } catch (error) {
+            console.error('Individual profile update error:', error);
+            return res.status(500).json({ success: false, error: 'Failed to update profile' });
         }
     });
 

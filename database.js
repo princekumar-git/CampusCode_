@@ -34,6 +34,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 mobile TEXT DEFAULT '',
                 joiningDate TEXT DEFAULT '',
                 course TEXT DEFAULT '',
+                github_link TEXT DEFAULT '',
+                location TEXT DEFAULT '',
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP  /* ✅ Added for Activity Feed and Monthly Trends */
             )`, (err) => {
                 if (err) console.error("Error creating users table:", err.message);
@@ -60,7 +62,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
                     { name: 'notif_submission_results', type: 'INTEGER DEFAULT 1' },
                     { name: 'notif_deadline_reminders', type: 'INTEGER DEFAULT 1' },
                     { name: 'pending_college_name', type: 'TEXT DEFAULT \'\'' },
-                    { name: 'college_request_status', type: 'TEXT DEFAULT \'\'' }
+                    { name: 'college_request_status', type: 'TEXT DEFAULT \'\'' },
+                    { name: 'github_link', type: 'TEXT DEFAULT \'\'' },
+                    { name: 'location', type: 'TEXT DEFAULT \'\'' }
                 ];
 
                 // Run migrations sequentially using a recursive helper to ensure all columns exist before creating indexes
@@ -144,10 +148,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 notif_deadline_reminders INTEGER DEFAULT 1,
                 pending_college_name TEXT DEFAULT '',
                 college_request_status TEXT DEFAULT '',
+                github_link TEXT DEFAULT '',
+                location TEXT DEFAULT '',
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
             )`, (err) => {
                 if (err) console.error("Error creating student table:", err.message);
             });
+            db.run(`ALTER TABLE student ADD COLUMN github_link TEXT DEFAULT ''`, () => {});
+            db.run(`ALTER TABLE student ADD COLUMN location TEXT DEFAULT ''`, () => {});
 
             db.run(`CREATE TABLE IF NOT EXISTS faculty (
                 id INTEGER PRIMARY KEY,
@@ -179,17 +187,30 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 notif_deadline_reminders INTEGER DEFAULT 1,
                 pending_college_name TEXT DEFAULT '',
                 college_request_status TEXT DEFAULT '',
+                github_link TEXT DEFAULT '',
+                location TEXT DEFAULT '',
                 createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
             )`, (err) => {
                 if (err) console.error("Error creating faculty table:", err.message);
             });
+            db.run(`ALTER TABLE faculty ADD COLUMN github_link TEXT DEFAULT ''`, () => {});
+            db.run(`ALTER TABLE faculty ADD COLUMN location TEXT DEFAULT ''`, () => {});
+
+            // Drop reverse-sync triggers before backfill to avoid stale definitions
+            // causing column-count mismatches during startup migrations.
+            db.run(`DROP TRIGGER IF EXISTS trg_student_to_users_ai`);
+            db.run(`DROP TRIGGER IF EXISTS trg_student_to_users_au`);
+            db.run(`DROP TRIGGER IF EXISTS trg_student_to_users_ad`);
+            db.run(`DROP TRIGGER IF EXISTS trg_faculty_to_users_ai`);
+            db.run(`DROP TRIGGER IF EXISTS trg_faculty_to_users_au`);
+            db.run(`DROP TRIGGER IF EXISTS trg_faculty_to_users_ad`);
 
             // Initial backfill from users -> student/faculty
             const mirrorCols = `
                 id, role, fullName, email, password, collegeName, department, branch, program, year, section,
                 status, is_verified, isVerified, post, gender, mobile, joiningDate, course, subject, points,
                 solvedCount, rank, is_hod, notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
-                pending_college_name, college_request_status, createdAt
+                pending_college_name, college_request_status, github_link, location, createdAt
             `;
             db.run(`DELETE FROM student`, (err) => {
                 if (err) console.error("Error clearing student split table:", err.message);
@@ -233,7 +254,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             NEW.status, NEW.is_verified, NEW.isVerified, NEW.post, NEW.gender, NEW.mobile,
                             NEW.joiningDate, NEW.course, NEW.subject, NEW.points, NEW.solvedCount, NEW.rank, NEW.is_hod,
                             NEW.notif_contest_alerts, NEW.notif_submission_results, NEW.notif_deadline_reminders,
-                            NEW.pending_college_name, NEW.college_request_status, NEW.createdAt
+                            NEW.pending_college_name, NEW.college_request_status, NEW.github_link, NEW.location, NEW.createdAt
                         WHERE LOWER(COALESCE(NEW.role, '')) IN ('student', 'individual', 'superadmin');
 
                         INSERT INTO faculty (${mirrorCols})
@@ -243,7 +264,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             NEW.status, NEW.is_verified, NEW.isVerified, NEW.post, NEW.gender, NEW.mobile,
                             NEW.joiningDate, NEW.course, NEW.subject, NEW.points, NEW.solvedCount, NEW.rank, NEW.is_hod,
                             NEW.notif_contest_alerts, NEW.notif_submission_results, NEW.notif_deadline_reminders,
-                            NEW.pending_college_name, NEW.college_request_status, NEW.createdAt
+                            NEW.pending_college_name, NEW.college_request_status, NEW.github_link, NEW.location, NEW.createdAt
                         WHERE LOWER(COALESCE(NEW.role, '')) IN ('faculty', 'hos', 'hod', 'admin');
                     END`, () => {});
 
@@ -260,7 +281,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             NEW.status, NEW.is_verified, NEW.isVerified, NEW.post, NEW.gender, NEW.mobile,
                             NEW.joiningDate, NEW.course, NEW.subject, NEW.points, NEW.solvedCount, NEW.rank, NEW.is_hod,
                             NEW.notif_contest_alerts, NEW.notif_submission_results, NEW.notif_deadline_reminders,
-                            NEW.pending_college_name, NEW.college_request_status, NEW.createdAt
+                            NEW.pending_college_name, NEW.college_request_status, NEW.github_link, NEW.location, NEW.createdAt
                         WHERE LOWER(COALESCE(NEW.role, '')) IN ('student', 'individual', 'superadmin');
 
                         INSERT INTO faculty (${mirrorCols})
@@ -270,7 +291,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             NEW.status, NEW.is_verified, NEW.isVerified, NEW.post, NEW.gender, NEW.mobile,
                             NEW.joiningDate, NEW.course, NEW.subject, NEW.points, NEW.solvedCount, NEW.rank, NEW.is_hod,
                             NEW.notif_contest_alerts, NEW.notif_submission_results, NEW.notif_deadline_reminders,
-                            NEW.pending_college_name, NEW.college_request_status, NEW.createdAt
+                            NEW.pending_college_name, NEW.college_request_status, NEW.github_link, NEW.location, NEW.createdAt
                         WHERE LOWER(COALESCE(NEW.role, '')) IN ('faculty', 'hos', 'hod', 'admin');
                     END`, () => {});
 
@@ -292,7 +313,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             NEW.status, NEW.is_verified, NEW.isVerified, NEW.post, NEW.gender, NEW.mobile,
                             NEW.joiningDate, NEW.course, NEW.subject, NEW.points, NEW.solvedCount, NEW.rank, NEW.is_hod,
                             NEW.notif_contest_alerts, NEW.notif_submission_results, NEW.notif_deadline_reminders,
-                            NEW.pending_college_name, NEW.college_request_status, NEW.createdAt
+                            NEW.pending_college_name, NEW.college_request_status, NEW.github_link, NEW.location, NEW.createdAt
                         );
                     END`, () => {});
 
@@ -344,7 +365,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             NEW.status, NEW.is_verified, NEW.isVerified, NEW.post, NEW.gender, NEW.mobile,
                             NEW.joiningDate, NEW.course, NEW.subject, NEW.points, NEW.solvedCount, NEW.rank, NEW.is_hod,
                             NEW.notif_contest_alerts, NEW.notif_submission_results, NEW.notif_deadline_reminders,
-                            NEW.pending_college_name, NEW.college_request_status, NEW.createdAt
+                            NEW.pending_college_name, NEW.college_request_status, NEW.github_link, NEW.location, NEW.createdAt
                         );
                     END`, () => {});
 
@@ -405,7 +426,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             role, fullName, email, password, collegeName, department, branch, program, year, section,
                             status, is_verified, isVerified, post, gender, mobile, joiningDate, course, subject, points,
                             solvedCount, rank, is_hod, notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
-                            pending_college_name, college_request_status, createdAt
+                            pending_college_name, college_request_status, github_link, location, createdAt
                         ) VALUES (
                             COALESCE(NEW.role, 'student'), NEW.fullName, NEW.email, NEW.password, NEW.collegeName,
                             NEW.department, NEW.branch, NEW.program, NEW.year, NEW.section,
@@ -413,7 +434,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             NEW.post, NEW.gender, NEW.mobile, NEW.joiningDate, NEW.course, NEW.subject, COALESCE(NEW.points, 0),
                             COALESCE(NEW.solvedCount, 0), COALESCE(NEW.rank, 0), COALESCE(NEW.is_hod, 0),
                             COALESCE(NEW.notif_contest_alerts, 1), COALESCE(NEW.notif_submission_results, 1), COALESCE(NEW.notif_deadline_reminders, 1),
-                            NEW.pending_college_name, NEW.college_request_status, COALESCE(NEW.createdAt, CURRENT_TIMESTAMP)
+                            NEW.pending_college_name, NEW.college_request_status, NEW.github_link, NEW.location, COALESCE(NEW.createdAt, CURRENT_TIMESTAMP)
                         );
                     END`, () => {});
 
@@ -449,7 +470,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
                             notif_submission_results = NEW.notif_submission_results,
                             notif_deadline_reminders = NEW.notif_deadline_reminders,
                             pending_college_name = NEW.pending_college_name,
-                            college_request_status = NEW.college_request_status
+                            college_request_status = NEW.college_request_status,
+                            github_link = NEW.github_link,
+                            location = NEW.location
                         WHERE id = OLD.id;
                     END`, () => {});
 
