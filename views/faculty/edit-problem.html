@@ -156,8 +156,14 @@
             }
         });
 
+        quill.on('text-change', function() {
+            var html = quill.root.innerHTML;
+            document.getElementById('hiddenDescription').value = html;
+        });
+
         document.getElementById('editProblemForm').onsubmit = function() {
-            var html = document.querySelector('.ql-editor').innerHTML;
+            // Aggressive capture: Get latest HTML directly from Quill root
+            var html = quill.root.innerHTML;
             document.getElementById('hiddenDescription').value = html;
         };
     });

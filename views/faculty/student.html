@@ -58,9 +58,6 @@
                             <button id="btn-export-students-v2" class="flex-1 sm:flex-none bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap">
                                 <i class="fas fa-download mr-2"></i> Export
                             </button>
-                            <button id="btn-add-student" class="flex-1 sm:flex-none bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap">
-                                <i class="fas fa-plus mr-2"></i> Add Student
-                            </button>
                         </div>
                     </div>
 
@@ -94,7 +91,8 @@
                                 <% (students || []).forEach(s => { %>
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer student-row group"
                                     data-id="<%= s.id %>" data-name="<%= s.fullName %>" data-email="<%= s.email %>"
-                                    data-section="<%= s.section || 'N/A' %>" data-year="<%= s.year || 'N/A' %>"
+                                    data-section="<%= s.section || 'A' %>" data-year="<%= s.year || '1st Year' %>"
+                                    data-status="<%= s.status || 'Active' %>"
                                     data-solved="<%= s.solvedCount || 0 %>" data-rank="<%= s.globalRank || s.rank || 999999 %>"
                                     data-points="<%= s.points || 0 %>" data-language="<%= s.language || 'N/A' %>">
                                     <td class="px-6 py-4">
@@ -125,7 +123,6 @@
                                     <td class="px-6 py-4 text-right">
                                         <div class="flex justify-end gap-2" onclick="event.stopPropagation()">
                                             <button data-student-id="<%= s.id %>" onclick="openEditStudentModal('<%= s.id %>')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all" title="Edit"><i class="fas fa-edit"></i></button>
-                                            <button data-student-id="<%= s.id %>" onclick="deleteStudent('<%= s.id %>')" class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all" title="Delete"><i class="fas fa-trash-alt"></i></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -135,25 +132,7 @@
                     </div>
                 </div>
 
-                <!-- Registration Form -->
-                <div id="student-form-view" class="hidden animate-fadeIn bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 max-w-3xl mx-auto mt-6 p-8">
-                    <div class="flex items-center justify-between mb-8">
-                        <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-                            <span class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center"><i class="fas fa-user-plus"></i></span>
-                            New Student Registration
-                        </h2>
-                        <button onclick="toggleStudentForm(false)" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><i class="fas fa-times text-xl"></i></button>
-                    </div>
-                    <form class="space-y-6">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Full Name</label><input type="text" class="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"></div>
-                            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label><input type="email" class="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"></div>
-                            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Student ID</label><input type="text" class="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"></div>
-                            <div><label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Section</label><select class="w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white"><option>A</option><option>B</option></select></div>
-                        </div>
-                        <div class="flex justify-end gap-3"><button type="button" onclick="toggleStudentForm(false)" class="px-6 py-2.5 text-red-600 bg-red-50 rounded-lg">Cancel</button><button type="submit" class="px-8 py-2.5 text-white bg-green-600 rounded-lg shadow-md">Register</button></div>
-                    </form>
-                </div>
+
             </main>
         </div>
     </div>
@@ -243,13 +222,7 @@
                 el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', applyFilters);
             });
 
-            // --- UTILITIES ---
-            window.toggleStudentForm = (show) => {
-                document.getElementById('student-list-container').classList.toggle('hidden', show);
-                document.getElementById('student-form-view').classList.toggle('hidden', !show);
-            };
 
-            document.getElementById('btn-add-student').onclick = () => window.toggleStudentForm(true);
 
             window.openEditStudentModal = (id) => {
                 const row = document.querySelector(`.student-row[data-id="${id}"]`);
@@ -259,24 +232,59 @@
                 document.getElementById('editStudentIdField').value = id;
                 document.getElementById('editStudentName').value = d.name;
                 document.getElementById('editStudentEmail').value = d.email;
-                document.getElementById('editStudentSection').value = d.section;
-                document.getElementById('editStudentYear').value = d.year;
+                document.getElementById('editStudentSection').value = d.section || 'A';
+                document.getElementById('editStudentYear').value = d.year || '1st Year';
+                if (document.getElementById('editStudentStatus')) {
+                    document.getElementById('editStudentStatus').value = d.status || 'Active';
+                }
                 editModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
             };
 
             window.closeEditStudentModal = () => editModal.classList.add('hidden');
 
-            window.deleteStudent = (id) => {
-                if(confirm('Delete student?')) {
-                    document.querySelector(`.student-row[data-id="${id}"]`).remove();
-                    applyFilters();
-                }
-            };
+
 
             // Initial Rank calc
             const rows = Array.from(document.querySelectorAll('.student-row'));
             rows.sort((a,b) => Number(b.dataset.points) - Number(a.dataset.points));
             rows.forEach((r, i) => { r.querySelector('.college-rank-cell').innerText = `#${i+1}`; });
+            
+            // --- EDIT STUDENT FORM SUBMISSION ---
+            const editForm = document.getElementById('editStudentForm');
+            if (editForm) {
+                editForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    
+                    const id = document.getElementById('editStudentId').value;
+                    const data = {
+                        fullName: document.getElementById('editStudentName').value,
+                        email: document.getElementById('editStudentEmail').value,
+                        section: document.getElementById('editStudentSection').value,
+                        year: document.getElementById('editStudentYear').value,
+                        status: document.getElementById('editStudentStatus').value
+                    };
+
+                    try {
+                        const res = await fetch(`/faculty/student/update/${id}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        const result = await res.json();
+                        
+                        if (result.success) {
+                            alert('Student updated successfully!');
+                            window.location.reload();
+                        } else {
+                            alert('Error: ' + result.message);
+                        }
+                    } catch (err) {
+                        console.error('Update failed:', err);
+                        alert('Failed to update student. Please try again.');
+                    }
+                });
+            }
         });
     </script>
 </body>

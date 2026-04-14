@@ -6,22 +6,22 @@ let currentUser = null;
 let currentNavConfig = null;
 let forumTopics = [];
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
     initializeTheme();
 
-    // 1. Fetch user context universally across pages
-    await fetchUserContext();
-
-    // 2. Identify the current page loosely based on path
+    // 1. Identify the current page based on content IDs or path
     const path = window.location.pathname;
 
-    if (path.includes('forum.html') || path.endsWith('/forum/') || path.endsWith('/forum') || path.includes('/student/forum')) {
+    if (document.getElementById('threadsContainer') || path.includes('forum.html')) {
         initForumListing();
-    } else if (path.includes('create.html')) {
+    } else if (document.getElementById('createThreadForm') || path.includes('create.html')) {
         initCreateThread();
-    } else if (path.includes('thread.html')) {
+    } else if (document.getElementById('threadContentArea') || path.includes('thread.html')) {
         initThreadDetail();
     }
+
+    // 2. Fetch user context in the background to avoid blocking UI initialization
+    fetchUserContext();
 });
 
 // ==========================================
@@ -247,6 +247,14 @@ function applyUserShell() {
         supportLink.href = '/auth/logout';
         supportLabel.textContent = 'Logout';
         supportLink.querySelector('i')?.classList.replace('fa-question-circle', 'fa-sign-out-alt');
+    }
+
+    // Automatically rewrite all back links globally so users don't get stuck in the wrong shell
+    const forumLinkObj = currentNavConfig?.items.find(item => item.key === 'community');
+    if (forumLinkObj) {
+        document.querySelectorAll('a[href="/forum/forum.html"]').forEach(link => {
+            link.href = forumLinkObj.href;
+        });
     }
 
     document.body.classList.toggle('superadmin-shell', normalizedRole === 'superadmin');
@@ -591,9 +599,12 @@ function initForumListing() {
                     deleteButtonHTML = `<button onclick="deleteThread(${t.id}, event)" class="absolute top-4 right-4 text-red-500 hover:bg-red-50 p-2 rounded-lg text-sm"><i class="fas fa-trash"></i> Delete</button>`;
                 }
 
+                const prefixMatch = window.location.pathname.match(/^(\/(?:faculty|student|hos|college\/hod))/);
+                const prefix = prefixMatch ? prefixMatch[1] : '';
+
                 container.innerHTML += `
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all cursor-pointer p-6 relative" 
-                         onclick="window.location.href='/forum/thread.html?id=${t.id}'">
+                         onclick="window.location.href='${prefix}/forum/thread?id=${t.id}'">
                         ${deleteButtonHTML}
                         <div class="flex items-center space-x-3 mb-2">
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}">${t.topic.toUpperCase()}</span>
@@ -623,13 +634,18 @@ function initForumListing() {
 
 window.deleteThread = async function(id, e) {
     if(e) e.stopPropagation();
-    if(!confirm("Are you sure you want to delete this thread? This action cannot be undone by SuperAdmin.")) return;
+    if(!confirm("Are you sure you want to delete this thread? This action cannot be undone.")) return;
 
     try {
         const res = await fetch(`/api/forum/threads/${id}`, { method: 'DELETE' });
         const data = await res.json();
         if(data.success) {
-            window.location.reload();
+            if (window.location.pathname.includes('thread.html')) {
+                const forumLinkObj = currentNavConfig?.items.find(item => item.key === 'community');
+                window.location.href = forumLinkObj ? forumLinkObj.href : '/forum/forum.html';
+            } else {
+                window.location.reload();
+            }
         } else {
             alert(data.message || 'Error deleting thread');
         }
@@ -669,15 +685,26 @@ function initCreateThread() {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const title = document.getElementById('threadTitle').value.trim();
-        const topic = document.getElementById('threadTopic').value;
-        const content = document.getElementById('threadContent').value.trim();
+        const titleEl = document.getElementById('threadTitle') || document.getElementById('title');
+        const title = titleEl ? titleEl.value.trim() : '';
+        
+        let topic = '';
+        const topicSelect = document.getElementById('threadTopic');
+        if (topicSelect) {
+            topic = topicSelect.value;
+        } else {
+            const topicRadio = document.querySelector('input[name="topic"]:checked');
+            if (topicRadio) topic = topicRadio.value;
+        }
+
+        const contentEl = document.getElementById('threadContent') || document.getElementById('content');
+        const content = contentEl ? contentEl.value.trim() : '';
 
         if(!title || !content) return;
 
-        const btn = form.querySelector('button[type="submit"]');
+        const btn = document.getElementById('submitBtn');
         btn.disabled = true;
-        btn.innerText = 'Posting...';
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Posting...';
 
         try {
             const res = await fetch('/api/forum/threads', {
@@ -685,21 +712,25 @@ function initCreateThread() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, topic, content })
             });
+
             const data = await res.json();
-            
             if(data.success) {
-                // Redirect to new thread
-                window.location.href = `/forum/thread.html?id=${data.thread_id}`;
+                // Return securely to the user's explicit module wrapper URL Instead of the global thread.html
+                const prefixMatch = window.location.pathname.match(/^(\/(?:faculty|student|hos|college\/hod))/);
+                const prefix = (prefixMatch && prefixMatch[1]) ? prefixMatch[1] : '';
+                
+                // Return to the main forum listing page instead of the specific thread
+                window.location.replace(`${prefix}/forum`);
             } else {
-                alert(data.message || "Failed to create thread.");
+                alert(data.message || 'Error creating thread');
                 btn.disabled = false;
-                btn.innerText = 'Post Thread';
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Post Discussion';
             }
         } catch (error) {
             console.error(error);
             alert("Network error.");
             btn.disabled = false;
-            btn.innerText = 'Post Thread';
+            btn.innerHTML = 'Post Thread';
         }
     });
 }
@@ -771,29 +802,79 @@ function initThreadDetail() {
             const data = await res.json();
             
             if(!data.success) {
-                threadOp.innerHTML = `<div class="text-red-500 text-center py-10">Thread not found or deleted.</div>`;
+                if(threadOp) threadOp.innerHTML = `<div class="text-red-500 text-center py-10">Thread not found or deleted.</div>`;
                 return;
             }
 
             const t = data.thread;
             const badgeColor = getBadgeColor(t.topic);
 
-            threadOp.innerHTML = `
-                <div class="flex items-center space-x-3 mb-4">
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}">${t.topic.toUpperCase()}</span>
-                    <span class="text-sm text-gray-500 dark:text-gray-400"><i class="far fa-user mr-1"></i> <b>${t.author_name}</b> </span>
-                    <span class="text-sm text-gray-400"><i class="far fa-clock mr-1"></i> ${new Date(t.createdAt).toLocaleString()}</span>
-                    <span class="text-sm text-gray-400 ml-auto"><i class="far fa-eye mr-1"></i> ${t.views} Views</span>
-                </div>
-                <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">${escapeHTML(t.title)}</h1>
-                <div class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap pb-4">${escapeHTML(t.content)}</div>
-            `;
+            // Handle New Role-Based Templates (If elements exist)
+            const titleEl = document.getElementById('threadTitle');
+            const bodyEl = document.getElementById('threadBody');
+            const opNameEl = document.getElementById('opName');
+            const opRoleEl = document.getElementById('opRole');
+            const opTopicEl = document.getElementById('opTopic');
+            const opDateEl = document.getElementById('opDate');
+            const loadingState = document.getElementById('loadingState');
+            const contentArea = document.getElementById('threadContentArea');
+
+            if (titleEl && bodyEl) {
+                // Populate granular fields
+                if(titleEl) titleEl.innerText = t.title;
+                if(bodyEl) {
+                    if (window.marked && window.DOMPurify) {
+                        bodyEl.innerHTML = window.DOMPurify.sanitize(window.marked.parse(t.content));
+                    } else {
+                        bodyEl.innerText = t.content;
+                    }
+                }
+                if(opNameEl) opNameEl.innerText = t.author_name;
+                if(opRoleEl) opRoleEl.innerText = String(t.author_role).toUpperCase();
+                if(opTopicEl) opTopicEl.innerText = String(t.topic).toUpperCase();
+                if(opDateEl) opDateEl.innerText = new Date(t.createdAt).toLocaleString();
+                
+                // Toggle visibility
+                if(loadingState) loadingState.classList.add('hidden');
+                if(contentArea) contentArea.classList.remove('hidden');
+
+                // Update votes/stats if IDs exist
+                const upCount = document.getElementById('upvoteCount');
+                const downCount = document.getElementById('downvoteCount');
+                if(upCount) upCount.innerText = t.upvotes || 0;
+                if(downCount) downCount.innerText = t.downvotes || 0;
+
+                const deleteBtn = document.getElementById('deleteThreadBtn');
+                if (deleteBtn && currentUser && currentUser.role === 'superadmin') {
+                    deleteBtn.classList.remove('hidden');
+                    deleteBtn.onclick = () => deleteThread(t.id);
+                }
+
+                const opAvatar = document.getElementById('opAvatar');
+                if (opAvatar) {
+                    const initials = t.author_name.split(' ').filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase() || 'U';
+                    opAvatar.innerText = initials;
+                }
+
+            } else if (threadOp) {
+                // Legacy Global Logic
+                threadOp.innerHTML = `
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium ${badgeColor}">${t.topic.toUpperCase()}</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400"><i class="far fa-user mr-1"></i> <b>${t.author_name}</b> </span>
+                        <span class="text-sm text-gray-400"><i class="far fa-clock mr-1"></i> ${new Date(t.createdAt).toLocaleString()}</span>
+                        <span class="text-sm text-gray-400 ml-auto"><i class="far fa-eye mr-1"></i> ${t.views} Views</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-4">${escapeHTML(t.title)}</h1>
+                    <div class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap pb-4">${escapeHTML(t.content)}</div>
+                `;
+            }
 
             renderReplies(data.replies);
 
         } catch (error) {
             console.error(error);
-            threadOp.innerHTML = `<div class="text-red-500">Error loading thread.</div>`;
+            if(threadOp) threadOp.innerHTML = `<div class="text-red-500">Error loading thread.</div>`;
         }
     }
 

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -193,32 +193,16 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <%
-                        const formatRelativeTime = (value) => {
-                            if (!value) return 'Recently';
-                            const activityDate = new Date(value);
-                            if (Number.isNaN(activityDate.getTime())) return 'Recently';
-                            const diffMs = Date.now() - activityDate.getTime();
-                            const diffMinutes = Math.max(1, Math.floor(diffMs / 60000));
-                            if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
-                            const diffHours = Math.floor(diffMinutes / 60);
-                            if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-                            const diffDays = Math.floor(diffHours / 24);
-                            if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-                            return activityDate.toLocaleDateString();
-                        };
-                    %>
                     <!-- Recent Activity Section -->
                     <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-gray-700">
                         <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Recent Activity</h2>
                         <div class="relative pl-4 border-l border-gray-200 dark:border-gray-700 space-y-6">
                             <% if ((recentActivity || []).length) { %>
-                                <% recentActivity.forEach((item) => { %>
+                                <% recentActivity.forEach((activity) => { %>
                                     <div class="relative">
-                                        <div class="absolute -left-[21px] top-1 h-3 w-3 rounded-full <%= item.colorClass || 'bg-gray-400' %> ring-4 ring-white dark:ring-gray-800"></div>
-                                        <p class="text-sm font-medium text-gray-900 dark:text-white"><%= item.actionLabel %> "<%= item.title %>"</p>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5"><%= formatRelativeTime(item.activityAt) %></p>
+                                        <div class="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-<%= activity.color %>-500 ring-4 ring-white dark:ring-gray-800"></div>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white"><%= activity.text %></p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5"><%= activity.time %></p>
                                     </div>
                                 <% }) %>
                             <% } else { %>

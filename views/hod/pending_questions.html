@@ -239,7 +239,7 @@
                                                 <input type="checkbox" class="q-checkbox rounded border-slate-600 bg-slate-700 text-primary-500" value="<%= q.id %>">
                                             </td>
                                             <td class="px-4 py-5">
-                                                <p class="text-sm font-bold text-white"><%= q.title %></p>
+                                                <p class="text-sm font-bold text-white"><%- q.title %></p>
                                             </td>
                                             <td class="px-4 py-5 text-center">
                                                 <% if (q.difficulty === 'Easy') { %>
@@ -279,7 +279,7 @@
                                             </td>
                                             <td class="px-4 py-5">
                                                 <div class="flex items-center gap-1.5">
-                                                    <a href="/college/hod/problem/view/<%= q.id %>"
+                                                    <a href="/college/hod/view-problem/<%= q.id %>"
                                                         class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-blue-400 hover:bg-slate-700 transition-colors" title="View Details">
                                                         <i class="far fa-eye text-xs"></i>
                                                     </a>

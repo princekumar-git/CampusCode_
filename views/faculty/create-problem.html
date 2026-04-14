@@ -171,9 +171,21 @@
             }
         });
 
-        document.getElementById('createProblemForm').onsubmit = function() {
-            var html = document.querySelector('.ql-editor').innerHTML;
+        quill.on('text-change', function() {
+            var html = quill.root.innerHTML;
             document.getElementById('hiddenDescription').value = html;
+        });
+
+        document.getElementById('createProblemForm').onsubmit = function() {
+            // Aggressive capture: Get latest HTML
+            let description = "";
+            const editorElem = document.querySelector('#editor-container .ql-editor');
+            if (editorElem) {
+                description = editorElem.innerHTML;
+            } else {
+                description = quill.root.innerHTML;
+            }
+            document.getElementById('hiddenDescription').value = description;
         };
     });
 </script>

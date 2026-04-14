@@ -60,41 +60,179 @@
     <%- include('partials/header.html', { pageTitle: 'Review Question', user: user }) %>
 
     <!-- Sub-header (IDE Navbar style) -->
-    <div class="h-12 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 bg-gray-50 dark:bg-gray-800 shrink-0">
-        <div class="flex items-center gap-4">
-            <a href="/hos/pending-questions" class="flex items-center gap-2 text-primary-600 dark:text-blue-400 font-semibold text-sm hover:underline">
-                <i class="fas fa-arrow-left"></i>
-                <span>Pending Questions</span>
-            </a>
-            <div class="h-4 w-px bg-gray-300 dark:bg-gray-600"></div>
-            <div class="flex items-center gap-3">
-                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider truncate max-w-[200px]"><%= problem.title %></span>
-                <% const navDiff = problem.difficulty || 'Easy'; %>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-medium
-                    <%= navDiff === 'Hard'   ? 'bg-red-100    text-red-700    dark:bg-red-900/40    dark:text-red-300'    :
-                        navDiff === 'Medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300' :
-                                              'bg-green-100  text-green-700  dark:bg-green-900/40  dark:text-green-300' %>">
-                    <%= navDiff %>
-                </span>
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase status-badge-<%= problem.status %>">
-                    <%= problem.status %>
-                </span>
-            </div>
-        </div>
-        <!-- Approve / Reject quick actions (only if pending) -->
-        <% if (problem.status === 'pending') { %>
-        <div class="flex items-center gap-2">
-            <button id="btnReject" 
-                class="px-4 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/20 dark:hover:bg-red-900/40 dark:text-red-400 border border-red-200 dark:border-red-800 transition-colors">
-                <i class="fas fa-times"></i> Reject
-            </button>
-            <button id="btnApprove"
-                class="px-4 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 bg-green-500 hover:bg-green-600 text-white shadow-sm transition-colors">
-                <i class="fas fa-check"></i> Approve
-            </button>
-        </div>
-        <% } %>
+<%
+    const _uname = (user && user.fullName) ? user.fullName : ((user && user.name) ? user.name : 'User');
+    const _initials = _uname.split(' ').map(function (n) { return n[0]; }).join('').toUpperCase().slice(0, 2);
+    const _displayName = _uname;
+%>
+
+  <!-- Integrated IDE Header -->
+  <header class="h-14 bg-[#0d1117] border-b border-gray-800 flex items-center justify-between px-6 shrink-0 z-50 shadow-lg text-gray-300">
+    <!-- Left: Navigation & Problem Info -->
+    <div class="flex items-center gap-6 overflow-hidden">
+      <a href="/hos/pending-questions" class="text-sm hover:text-white flex items-center gap-2 transition-colors shrink-0">
+        <i class="fas fa-arrow-left text-xs"></i> 
+        <span>Pending Questions</span>
+      </a>
+      
+      <div class="h-4 w-px bg-gray-700 shrink-0"></div>
+      
+      <div class="flex items-center gap-3 overflow-hidden">
+        <h1 class="text-base font-bold text-white truncate"><%= problem.title %></h1>
+        
+        <% 
+            const diffLabel = (problem.difficulty || 'Easy');
+            const diffLower = diffLabel.toLowerCase();
+            let badgeStyle = 'bg-gray-800 text-gray-300';
+            if (diffLower === 'easy') badgeStyle = 'bg-green-500/10 text-green-500 border border-green-500/20';
+            else if (diffLower === 'medium') badgeStyle = 'bg-amber-500/20 text-amber-500 border border-amber-500/30';
+            else if (diffLower === 'hard') badgeStyle = 'bg-red-500/20 text-red-500 border border-red-500/30';
+        %>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider <%= badgeStyle %>">
+            <%= diffLabel %>
+        </span>
+        
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase status-badge-<%= problem.status %>">
+            <%= problem.status %>
+        </span>
+      </div>
     </div>
+
+    <!-- Center-Right: Approve/Reject Actions -->
+    <div class="flex items-center gap-4">
+        <% if (problem.status === 'pending') { %>
+            <div class="flex items-center gap-2 mr-4 border-r border-gray-700 pr-5">
+                <button id="btnReject" 
+                    class="px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 transition-colors">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+                <button id="btnApprove"
+                    class="px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors">
+                    <i class="fas fa-check"></i> Approve
+                </button>
+            </div>
+        <% } %>
+
+        <div class="flex items-center gap-5">
+            <button id="themeToggleBtn" class="hover:text-white transition-colors p-1" title="Toggle Theme">
+                <i class="fas fa-sun text-lg"></i>
+            </button>
+            
+            <div class="relative">
+                <button id="notificationBtn" class="hover:text-white transition-colors p-1 relative" title="Notifications">
+                    <i class="fas fa-bell text-lg"></i>
+                    <span class="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 border border-[#0d1117]"></span>
+                </button>
+            </div>
+            
+            <div class="h-4 w-px bg-gray-700 shrink-0 mx-1"></div>
+            
+            <button id="headerProfileBtn" class="flex items-center gap-3 hover:opacity-80 transition-opacity p-0.5 group">
+                <div class="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-xs">
+                    <%= _initials %>
+                </div>
+                <span class="text-sm font-medium hidden md:block text-gray-300 group-hover:text-white transition-colors"><%= _displayName %></span>
+            </button>
+        </div>
+    </div>
+  </header>
+
+  <!-- Notification Dropdown -->
+  <div id="notificationDropdown" class="fixed top-14 right-6 z-[60] w-80 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-100 dark:border-gray-700 hidden animate-[fadeIn_0.1s_ease-out]">
+      <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+          <h3 class="font-semibold text-gray-800 dark:text-white">Notifications</h3>
+          <span class="text-xs text-primary-500 cursor-pointer hover:underline">Mark all read</span>
+      </div>
+      <div class="p-2">
+          <div class="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer">
+              <p class="text-sm text-gray-800 dark:text-gray-200 font-medium">HOS Activity</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Your latest HOS activity appears here.</p>
+          </div>
+      </div>
+  </div>
+
+  <!-- Profile Overlay (Restored Origin Version) -->
+  <div id="profileOverlay" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
+      <div class="w-[380px] bg-white dark:bg-gray-800 rounded-3xl shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+          <div class="bg-gradient-to-br from-[#1E4A7A] to-[#153255] relative pt-12 pb-20 px-6 text-center">
+              <button id="closeProfileOverlay" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/90 transition-all flex items-center justify-center backdrop-blur-sm">
+                  <i class="fas fa-times text-sm"></i>
+              </button>
+              <div class="absolute left-1/2 bottom-[-48px] -translate-x-1/2">
+                  <div class="relative w-24 h-24 rounded-full p-1.5 bg-white dark:bg-gray-800 ring-4 ring-[#1E4A7A]/10 dark:ring-[#1E4A7A]/30">
+                      <div class="w-full h-full rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-3xl font-bold shadow-inner">
+                          <%= _initials %>
+                      </div>
+                      <div class="absolute bottom-0 right-0 w-6 h-6 bg-green-500 border-4 border-white dark:border-gray-800 rounded-full"></div>
+                  </div>
+              </div>
+          </div>
+
+          <div class="pt-16 pb-8 px-6">
+              <div class="text-center mb-6">
+                  <h2 class="text-2xl font-bold text-gray-900 dark:text-white mb-1"><%= _displayName %></h2>
+                  <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2"><%= user.collegeName || 'CampusCode College' %></p>
+                  <div class="flex items-center justify-center gap-2 flex-wrap">
+                      <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800"><%= user.department || 'General' %> Dept</span>
+                      <span class="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-100 dark:border-purple-800"><%= user.role ? user.role.toUpperCase() : 'HOS' %></span>
+                  </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 mb-6">
+                  <div class="p-3 rounded-2xl bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 text-center">
+                      <p class="text-xs text-gray-500 uppercase font-semibold">Faculty ID</p>
+                      <p class="text-sm font-bold text-gray-800 dark:text-gray-200">FAC-<%= user.id %></p>
+                  </div>
+                  <div class="p-3 rounded-2xl bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700 text-center">
+                      <p class="text-xs text-gray-500 uppercase font-semibold">Joined</p>
+                      <p class="text-sm font-bold text-gray-800 dark:text-gray-200"><%= user.joiningDate || 'Unknown' %></p>
+                  </div>
+              </div>
+
+              <div class="space-y-3">
+                  <button id="logoutBtn" class="w-full flex items-center justify-between p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 group transition-all duration-200 border border-transparent hover:border-red-100 dark:hover:border-red-800">
+                      <div class="flex items-center gap-3">
+                          <div class="w-8 h-8 rounded-full bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center">
+                              <i class="fas fa-sign-out-alt text-sm"></i>
+                          </div>
+                          <span class="text-sm font-medium text-gray-700 dark:text-gray-200 group-hover:text-red-600 dark:group-hover:text-red-400">Logout</span>
+                      </div>
+                      <i class="fas fa-chevron-right text-xs text-gray-400 group-hover:text-red-500 dark:group-hover:text-red-400"></i>
+                  </button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <script>
+    // Header Toggle Logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const notifBtn = document.getElementById('notificationBtn');
+        const notifDropdown = document.getElementById('notificationDropdown');
+        const profileBtn = document.getElementById('headerProfileBtn');
+        const profileOverlay = document.getElementById('profileOverlay');
+        const closeProfile = document.getElementById('closeProfileOverlay');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        if (notifBtn) {
+            notifBtn.onclick = (e) => { e.stopPropagation(); notifDropdown.classList.toggle('hidden'); };
+        }
+        if (profileBtn) {
+            profileBtn.onclick = () => profileOverlay.classList.remove('hidden');
+        }
+        if (closeProfile) {
+            closeProfile.onclick = () => profileOverlay.classList.add('hidden');
+        }
+        document.addEventListener('click', (e) => {
+            if (notifDropdown && !notifDropdown.contains(e.target) && e.target !== notifBtn) {
+                notifDropdown.classList.add('hidden');
+            }
+        });
+        if (logoutBtn) {
+            logoutBtn.onclick = () => { window.location.href = '/logout'; };
+        }
+    });
+  </script>
 
     <!-- Main IDE-split layout -->
     <main class="flex-1 flex overflow-hidden">
@@ -150,7 +288,7 @@
 
                 <% if (problem.description) { %>
                 <div class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap prose dark:prose-invert max-w-none">
-                    <%= problem.description %>
+                    <%- problem.description %>
                 </div>
                 <% } %>
 

@@ -277,7 +277,10 @@ module.exports = (db, transporter) => {
                 collegeName: user.collegeName,
                 department: user.branch || user.department || '',
                 course: user.program || user.course || '',
-                isVerified: user.isVerified === 1 || user.isVerified === true
+                isVerified: user.isVerified === 1 || user.isVerified === true,
+                joiningDate: user.joiningDate || '',
+                github_link: user.github_link || '',
+                location: user.location || ''
             };
 
             // Redirect based on role

@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const { requireRole } = require('../middleware/auth');
 const { checkScope } = require('../middleware/authMiddleware');
+const sanitizeHtml = require('sanitize-html');
 
 module.exports = (db, transporter) => {
     function dbGet(query, params = []) {
@@ -579,6 +580,42 @@ module.exports = (db, transporter) => {
     });
 
     // Unified HOD Dashboard
+    router.get('/hod/view-problem/:id', requireRole('hod'), checkScope, (req, res) => {
+        const problemId = req.params.id;
+        db.get('SELECT * FROM problems WHERE id = ?', [problemId], (err, problem) => {
+            if (err) return res.status(500).send('Database error');
+            if (!problem) return res.status(404).send('Problem not found');
+            if (problem.description) {
+                problem.description = sanitizeHtml(problem.description, {
+                    allowedTags: sanitizeHtml.defaults.allowedTags.concat([ 'img', 'u', 's', 'pre', 'code' ]),
+                    allowedAttributes: Object.assign({}, sanitizeHtml.defaults.allowedAttributes, {
+                        '*': ['style', 'class'],
+                        'img': ['src', 'alt', 'width', 'height']
+                    })
+                });
+            }
+            res.render('hod/view-problem.html', {
+                user: req.session.user,
+                problem: problem,
+                currentPage: 'problem'
+            });
+        });
+    });
+
+    router.get('/hod/forum', requireRole('hod'), checkScope, (req, res) => {
+        res.render('hod/forum.html', { user: req.session.user, currentPage: 'community', pageTitle: 'Community' });
+    });
+
+    router.get('/hod/forum/create', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('hod/forum-create.html', { user: req.session.user, currentPage: 'community', pageTitle: 'Create Discussion' });
+    });
+
+    router.get('/hod/forum/thread', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('hod/forum-thread.html', { user: req.session.user, currentPage: 'community', pageTitle: 'View Discussion' });
+    });
+
+    router.get('/hod/community', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => res.redirect('/college/hod/forum'));
+
     router.get('/hod/dashboard', requireRole('hod'), checkScope, (req, res) => {
         const dept = req.session.user.department;
         const college = req.session.user.collegeName;
@@ -599,23 +636,25 @@ module.exports = (db, transporter) => {
             SELECT *
             FROM (
                 SELECT
-                    'problem' AS kind,
+                    'problem' AS type,
                     p.title AS title,
                     p.createdAt AS activityAt,
-                    'Submitted problem' AS actionLabel,
-                    'bg-blue-500' AS colorClass
+                    u.fullName AS author,
+                    p.status AS status
                 FROM problems p
+                LEFT JOIN account_users u ON p.faculty_id = u.id
                 WHERE p.department = ?
 
                 UNION ALL
 
                 SELECT
-                    'contest' AS kind,
+                    'contest' AS type,
                     c.title AS title,
                     COALESCE(c.createdAt, c.startDate, c.date) AS activityAt,
-                    'Created contest' AS actionLabel,
-                    'bg-purple-500' AS colorClass
+                    u.fullName AS author,
+                    c.status AS status
                 FROM contests c
+                LEFT JOIN account_users u ON c.createdBy = u.id
                 WHERE c.department = ?
             ) recent_items
             WHERE activityAt IS NOT NULL
@@ -678,6 +717,27 @@ module.exports = (db, transporter) => {
                                 trendCounts.push(row ? row.count : 0);
                             }
 
+                            const getTimeAgo = (date) => {
+                                if (!date) return "Unknown";
+                                const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+                                if (seconds < 60) return "Just now";
+                                const minutes = Math.floor(seconds / 60);
+                                if (minutes < 60) return `${minutes}m ago`;
+                                const hours = Math.floor(minutes / 60);
+                                if (hours < 24) return `${hours}h ago`;
+                                const days = Math.floor(hours / 24);
+                                if (days < 7) return `${days}d ago`;
+                                return new Date(date).toLocaleDateString();
+                            };
+
+                            const formattedActivity = (recentActivity || []).map(item => ({
+                                text: `${item.type === 'problem' ? 'Submitted' : 'Created'} ${item.type} "${item.title}" by ${item.author || 'Faculty'}`,
+                                time: getTimeAgo(item.activityAt),
+                                color: item.type === 'problem' 
+                                    ? (item.status === 'accepted' ? 'green' : (item.status === 'pending' ? 'yellow' : 'blue'))
+                                    : 'purple'
+                            }));
+
                             const graphData = { difficultySpread, trendLabels, trendCounts };
 
                                 res.render('hod/dashboard.html', {
@@ -685,7 +745,7 @@ module.exports = (db, transporter) => {
                                     stats,
                                     pendingQuestions,
                                     pendingContests,
-                                    recentActivity: recentActivity || [],
+                                    recentActivity: formattedActivity,
                                     graphData,
                                     currentPage: 'dashboard'
                                 });
@@ -997,7 +1057,7 @@ module.exports = (db, transporter) => {
             `UPDATE users 
              SET fullName = ?, email = ?, year = ?, section = ?, status = ? 
              WHERE id = ? AND department = ? AND collegeName = ? AND role = 'student'`,
-            [fullName, email, year, section, status, studentId, hodDept, hodCollege],
+            [fullName, email, year, section, String(status || 'active').toLowerCase(), studentId, hodDept, hodCollege],
             function(err) {
                 if (err) return res.status(500).json({ success: false, message: err.message });
                 if (this.changes === 0) return res.status(404).json({ success: false, message: 'Student not found or unauthorized' });
@@ -1060,11 +1120,6 @@ module.exports = (db, transporter) => {
                 );
             }
         );
-    });
-
-    // HOD: View Problem (using student view but keeping HOD URL)
-    router.get('/hod/problem/view/:id', requireRole('hod'), (req, res) => {
-        res.sendFile(path.join(__dirname, '..', 'views', 'student', 'problem_page.html'));
     });
 
     // Contest Management

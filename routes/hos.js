@@ -4,6 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { requireRole } = require('../middleware/auth');
 const { checkScope } = require('../middleware/authMiddleware');
+const sanitizeHtml = require('sanitize-html');
 
 module.exports = (db) => {
     const router = express.Router();
@@ -100,6 +101,20 @@ module.exports = (db) => {
         }
     });
 
+    router.get('/hos/forum', requireRole('hos'), checkScope, (req, res) => {
+        res.render('hos/forum.html', { user: req.session.user, currentPage: 'community', pageTitle: 'Community' });
+    });
+
+    router.get('/hos/forum/create', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('hos/forum-create.html', { user: req.session.user, currentPage: 'community', pageTitle: 'Create Discussion' });
+    });
+
+    router.get('/hos/forum/thread', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('hos/forum-thread.html', { user: req.session.user, currentPage: 'community', pageTitle: 'View Discussion' });
+    });
+
+    router.get('/hos/community', requireRole('hos'), checkScope, (req, res) => res.redirect('/hos/forum'));
+
     // HOS Dashboard
     router.get('/hos/dashboard', requireRole('hos'), checkScope, async (req, res) => {
         try {
@@ -191,6 +206,19 @@ module.exports = (db) => {
                 trendCounts.push(row ? row.count : 0);
             }
 
+            const getTimeAgo = (date) => {
+                if (!date) return "Unknown";
+                const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+                if (seconds < 60) return "Just now";
+                const minutes = Math.floor(seconds / 60);
+                if (minutes < 60) return `${minutes}m ago`;
+                const hours = Math.floor(minutes / 60);
+                if (hours < 24) return `${hours}h ago`;
+                const days = Math.floor(hours / 24);
+                if (days < 7) return `${days}d ago`;
+                return new Date(date).toLocaleDateString();
+            };
+
             // Recent Activity (last 5 problems + contests, any status)
             const recentProblems = await new Promise((resolve, reject) => {
                 db.all(`SELECT p.title, p.status, p.createdAt, 'problem' as type, u.fullName as author FROM problems p JOIN account_users u ON p.faculty_id = u.id WHERE (p.subject IN (${subjectPlaceholders}) OR p.faculty_id = ?) ORDER BY p.createdAt DESC LIMIT 5`, [...subjects, hosId], (err, rows) => {
@@ -204,7 +232,14 @@ module.exports = (db) => {
             });
             const recentActivity = [...recentProblems, ...recentContestsAll]
                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                .slice(0, 5);
+                .slice(0, 5)
+                .map(item => ({
+                    text: `${item.type === 'problem' ? 'Submitted' : 'Created'} ${item.type} "${item.title}" by ${item.author}`,
+                    time: getTimeAgo(item.createdAt),
+                    color: item.type === 'problem' 
+                        ? (item.status === 'accepted' ? 'green' : (item.status === 'pending' ? 'yellow' : 'blue'))
+                        : 'purple'
+                }));
 
             res.render('hos/dashboard.html', {
                 user: req.session.user,
@@ -528,27 +563,26 @@ module.exports = (db) => {
     });
 
     // HOS: Problem View Page (IDE-like view)
-    router.get('/hos/problem_page', requireRole('hos'), checkScope, async (req, res) => {
-        const problemId = parseInt(req.query.id, 10);
-        if (!problemId) return res.status(400).send('Missing problem ID.');
-        try {
-            db.get(
-                `SELECT p.*, u.fullName as facultyName, u.role as creatorRole
-                 FROM problems p
-                 LEFT JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id
-                 WHERE p.id = ?`,
-                [problemId],
-                (err, problem) => {
-                    if (err) return res.status(500).send(err.message);
-                    if (!problem) return res.status(404).send('Problem not found.');
-                    res.render('hos/problem_page.html', {
-                        user: req.session.user,
-                        problem,
-                        currentPage: 'problem'
-                    });
-                }
-            );
-        } catch (e) { res.status(500).send(e.message); }
+    router.get('/hos/view-problem/:id', requireRole('hos'), checkScope, async (req, res) => {
+        const problemId = req.params.id;
+        db.get('SELECT * FROM problems WHERE id = ?', [problemId], (err, problem) => {
+            if (err) return res.status(500).send('Database error');
+            if (!problem) return res.status(404).send('Problem not found');
+            if (problem.description) {
+                problem.description = sanitizeHtml(problem.description, {
+                    allowedTags: sanitizeHtml.defaults.allowedTags.concat([ 'img', 'u', 's', 'pre', 'code' ]),
+                    allowedAttributes: Object.assign({}, sanitizeHtml.defaults.allowedAttributes, {
+                        '*': ['style', 'class'],
+                        'img': ['src', 'alt', 'width', 'height']
+                    })
+                });
+            }
+            res.render('hos/view-problem.html', {
+                user: req.session.user,
+                problem: problem,
+                currentPage: 'problem'
+            });
+        });
     });
 
     router.get('/hos/contest', requireRole('hos'), checkScope, async (req, res) => {
@@ -931,7 +965,7 @@ module.exports = (db) => {
         const department = req.session.user.department;
         try {
             const students = await new Promise((resolve, reject) => {
-                db.all(`SELECT id, fullName, email, course, department, joiningDate 
+                db.all(`SELECT id, fullName, email, course, department, joiningDate, status, year, section 
                         FROM account_users 
                         WHERE role = 'student' AND collegeName = ? AND department = ? 
                         ORDER BY fullName ASC`,
@@ -1616,10 +1650,13 @@ module.exports = (db) => {
             const status = 'accepted'; // HOS auto-approves
             const scope = visibility_scope || 'global';
 
+            const finalDescription = String(description || '').trim();
+            const finalTags = String(tags || '').trim();
+
             db.run(
                 `INSERT INTO problems (title, description, subject, difficulty, points, input_format, output_format, constraints, sample_input, sample_output, faculty_id, is_public, department, visibility_scope, status, tags, created_by, hos_verified, approved_by, approved_at) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [title, description, subject, difficulty, points, input_format || '', output_format || '', constraints || '', sample_input || '', sample_output || '', user.id, 1, user.department, scope, status, tags || '', user.id, 1, user.id, new Date().toISOString()],
+                [title, finalDescription, subject, difficulty, points, input_format || '', output_format || '', constraints || '', sample_input || '', sample_output || '', user.id, 1, user.department, scope, status, finalTags, user.id, 1, user.id, new Date().toISOString()],
                 function (err) {
                     if (err) return res.status(500).json({ success: false, message: err.message });
                     const problemId = this.lastID;
@@ -1661,9 +1698,12 @@ module.exports = (db) => {
             const getPoints = (diff) => ({ 'easy': 5, 'medium': 10, 'hard': 15 }[String(diff || 'easy').toLowerCase()] || 5);
             const points = getPoints(difficulty);
 
+            const finalDesc = String(description || '').trim();
+            const finalTags = String(tags || '').trim();
+
             db.run(
                 `UPDATE problems SET title=?, description=?, subject=?, difficulty=?, points=?, input_format=?, output_format=?, constraints=?, sample_input=?, sample_output=?, tags=?, visibility_scope=? WHERE id=?`,
-                [title, description, subject, difficulty, points, input_format, output_format, constraints, sample_input, sample_output, tags, visibility_scope || 'global', problemId],
+                [title, finalDesc, subject, difficulty, points, input_format || '', output_format || '', constraints || '', sample_input || '', sample_output || '', finalTags, visibility_scope || 'global', problemId],
                 function (err) {
                     if (err) return res.status(500).json({ success: false, message: err.message });
 
@@ -1732,7 +1772,27 @@ module.exports = (db) => {
         });
     });
 
+    // HOS: Update Student Profile
+    router.post('/hos/student/update/:id', requireRole('hos'), (req, res) => {
+        const { fullName, email, year, section, status } = req.body;
+        const studentId = req.params.id;
+        const user = req.session.user;
+
+        db.run(
+            `UPDATE users 
+             SET fullName = ?, email = ?, year = ?, section = ?, status = ? 
+             WHERE id = ? AND collegeName = ? AND role = 'student'`,
+            [fullName, email, year, section, String(status || 'active').toLowerCase(), studentId, user.collegeName],
+            function(err) {
+                if (err) return res.status(500).json({ success: false, message: err.message });
+                if (this.changes === 0) return res.status(404).json({ success: false, message: 'Student not found or unauthorized' });
+                res.json({ success: true, message: 'Student updated successfully!' });
+            }
+        );
+    });
+
     return router;
+
 };
 
 

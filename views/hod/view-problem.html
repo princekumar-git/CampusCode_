@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>View Problem - Faculty Dashboard</title>
+  <title>View Problem - HOD Dashboard</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -22,7 +22,7 @@
     };
   </script>
   <link rel="stylesheet" href="/css/shared.css">
-  <link rel="stylesheet" href="/css/faculty/style.css">
+  <link rel="stylesheet" href="/css/hod/style.css">
 </head>
 
 <body class="bg-gray-50 dark:bg-gray-900 h-screen flex flex-col font-sans overflow-hidden transition-colors duration-200">
@@ -37,7 +37,7 @@
   <header class="h-14 bg-[#0d1117] border-b border-gray-800 flex items-center justify-between px-6 shrink-0 z-50 shadow-lg text-gray-300">
     <!-- Left: Navigation & Problem Info -->
     <div class="flex items-center gap-6 overflow-hidden">
-      <a href="/faculty/problem" class="text-sm hover:text-white flex items-center gap-2 transition-colors shrink-0">
+      <a href="/college/hod/problem" class="text-sm hover:text-white flex items-center gap-2 transition-colors shrink-0">
         <i class="fas fa-arrow-left text-xs"></i> 
         <span>Back to Problems</span>
       </a>
@@ -95,8 +95,8 @@
       </div>
       <div class="p-2">
           <div class="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg cursor-pointer">
-              <p class="text-sm text-gray-800 dark:text-gray-200 font-medium">Faculty Activity</p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">Your latest faculty activity appears here.</p>
+              <p class="text-sm text-gray-800 dark:text-gray-200 font-medium">HOD Activity</p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">Your latest HOD activity appears here.</p>
           </div>
       </div>
   </div>
@@ -124,7 +124,7 @@
                   <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2"><%= user.collegeName || 'CampusCode College' %></p>
                   <div class="flex items-center justify-center gap-2 flex-wrap">
                       <span class="px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border border-blue-100 dark:border-blue-800"><%= user.department || 'General' %> Dept</span>
-                      <span class="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-100 dark:border-purple-800"><%= user.role ? user.role.toUpperCase() : 'FACULTY' %></span>
+                      <span class="px-3 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-100 dark:border-purple-800"><%= user.role ? user.role.toUpperCase() : 'HOD' %></span>
                   </div>
               </div>
 
@@ -328,7 +328,6 @@
     editor.setValue(templates.python);
 
     // loadProblem() removed - using server-side rendering
-
     async function runCode() {
       const code = editor.getValue();
       const lang = document.getElementById('languageSelect').value;
