@@ -57,10 +57,6 @@
                                 class="flex-1 sm:flex-none bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap">
                                 <i class="fas fa-download mr-2"></i> Export
                             </button>
-                            <button id="btn-add-student"
-                                class="flex-1 sm:flex-none bg-primary-500 hover:bg-primary-600 text-white px-6 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm whitespace-nowrap">
-                                <i class="fas fa-plus mr-2"></i> Add Student
-                            </button>
                         </div>
                     </div>
 
@@ -119,7 +115,7 @@
                                     <% students.forEach(student => { %>
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer student-row group"
                                             data-id="<%= student.id %>" data-name="<%= student.fullName %>" data-email="<%= student.email %>"
-                                            data-section="<%= student.assignedSections %>" data-year="<%= student.assignedYears %>" data-solved="0" data-rank="0"
+                                            data-section="<%= student.assignedSections %>" data-year="<%= student.assignedYears %>" data-status="<%= student.status || 'Active' %>" data-solved="0" data-rank="0"
                                             data-points="0">
                                             <td class="px-6 py-4">
                                                 <div class="flex items-center gap-4">
@@ -160,17 +156,11 @@
                                                     <span class="flex h-1.5 w-1.5 rounded-full bg-green-500"></span> Active
                                                 </span>
                                             </td>
-                                            <td class="px-6 py-4 text-right">
                                                 <div class="flex justify-end gap-2" onclick="event.stopPropagation()">
-                                                    <button
+                                                    <button onclick="openEditModal('<%= student.id %>')"
                                                         class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                                                         title="Edit">
                                                         <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <button
-                                                        class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
-                                                        title="Delete">
-                                                        <i class="fas fa-trash-alt"></i>
                                                     </button>
                                                 </div>
                                             </td>
@@ -191,61 +181,7 @@
                     </div>
                 </div>
 
-                <div id="student-form-view"
-                    class="hidden animate-fadeIn bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 max-w-3xl mx-auto mt-6">
-                    <div class="p-8">
-                        <div class="flex items-center justify-between mb-8">
-                            <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-3">
-                                <span
-                                    class="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center"><i
-                                        class="fas fa-user-plus"></i></span>
-                                New Student Registration
-                            </h2>
-                            <button id="btn-back-to-student-list"
-                                class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><i
-                                    class="fas fa-times text-xl"></i></button>
-                        </div>
-                        <form class="space-y-8">
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div><label
-                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Full
-                                        Name</label><input type="text"
-                                        class="block w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                                </div>
-                                <div><label
-                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Email</label><input
-                                        type="email"
-                                        class="block w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                                </div>
-                                <div><label
-                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Student
-                                        ID</label><input type="text"
-                                        class="block w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                                </div>
-                                <div><label
-                                         class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Section</label><select
-                                         class="block w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                                         <% dropdownData.sections.forEach(section => { %>
-                                             <option value="<%= section.section_name %>"><%= section.section_name %></option>
-                                         <% }) %>
-                                     </select></div>
-                                 <div><label
-                                         class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Year</label><select
-                                         class="block w-full p-2.5 border rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                                         <% dropdownData.years.forEach(year => { %>
-                                             <option value="<%= year.year_name %>"><%= year.year_name %></option>
-                                         <% }) %>
-                                     </select></div>
-                            </div>
-                            <div class="flex justify-end gap-4">
-                                <button type="button" id="btn-cancel-student-form"
-                                    class="px-6 py-2.5 text-red-600 bg-red-50 rounded-lg">Cancel</button>
-                                <button type="submit"
-                                    class="px-8 py-2.5 text-white bg-green-600 rounded-lg">Register</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+
             </main>
         </div>
     </div>
@@ -435,22 +371,30 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", () => {
-            // --- STUDENT FORM TOGGLE ---
-            const btnAdd = document.getElementById('btn-add-student');
-            const btnBack = document.getElementById('btn-back-to-student-list');
-            const btnCancel = document.getElementById('btn-cancel-student-form');
-            const listContainer = document.getElementById('student-list-container');
-            const formContainer = document.getElementById('student-form-view');
 
-            const toggleForm = (show) => {
-                if (!listContainer || !formContainer) return;
-                listContainer.classList.toggle('hidden', show);
-                formContainer.classList.toggle('hidden', !show);
+
+
+            window.openEditModal = (id) => {
+                const row = document.querySelector(`.student-row[data-id="${id}"]`);
+                if(!row) return;
+                const d = row.dataset;
+                document.getElementById('editStudentId').value = id;
+                document.getElementById('editStudentIdField').value = id;
+                document.getElementById('editStudentName').value = d.name;
+                document.getElementById('editStudentEmail').value = d.email;
+                document.getElementById('editStudentSection').value = d.section || 'A';
+                document.getElementById('editStudentYear').value = d.year || '1st Year';
+                document.getElementById('editStudentStatus').value = d.status || 'Active';
+                
+                document.getElementById('editStudentModal').classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
             };
 
-            if (btnAdd) btnAdd.addEventListener('click', () => toggleForm(true));
-            if (btnBack) btnBack.addEventListener('click', () => toggleForm(false));
-            if (btnCancel) btnCancel.addEventListener('click', () => toggleForm(false));
+            window.closeEditModal = () => {
+                const modal = document.getElementById('editStudentModal');
+                if (modal) modal.classList.add('hidden');
+                document.body.style.overflow = 'auto';
+            };
 
             // --- STUDENT DETAIL OVERLAY LOGIC ---
             const studentRows = document.querySelectorAll('.student-row');
@@ -506,24 +450,7 @@
             if (table) {
                 table.addEventListener('click', (e) => {
                     const editBtn = e.target.closest('button[title="Edit"]');
-                    const deleteBtn = e.target.closest('button[title="Delete"]');
-
-                    if (editBtn) {
-                        e.stopPropagation(); // Double check propagation stop
-                        const row = editBtn.closest('tr');
-                        const name = row.dataset.name || "Student";
-                        alert(`Edit Student: ${name}\n(Modal would open here)`);
-                    }
-
-                    if (deleteBtn) {
-                        e.stopPropagation();
-                        const row = deleteBtn.closest('tr');
-                        const name = row.dataset.name || "Student";
-                        if (confirm(`Are you sure you want to delete ${name}?`)) {
-                            row.style.opacity = '0';
-                            setTimeout(() => row.remove(), 300);
-                        }
-                    }
+                    // Delete button logic removed
                 });
             }
 
@@ -579,76 +506,49 @@
             // Close edit modal handlers
             if (closeEditStudentModal) {
                 closeEditStudentModal.addEventListener('click', () => {
-                    editStudentModal.classList.add('hidden');
-                    currentEditingStudentRow = null;
+                    window.closeEditModal();
                 });
             }
 
             if (btnCancelEditStudent) {
                 btnCancelEditStudent.addEventListener('click', () => {
-                    editStudentModal.classList.add('hidden');
-                    currentEditingStudentRow = null;
+                    window.closeEditModal();
                 });
             }
 
             // Handle form submission
             if (editStudentForm) {
-                editStudentForm.addEventListener('submit', (e) => {
+                editStudentForm.addEventListener('submit', async (e) => {
                     e.preventDefault();
 
                     // Get updated values
-                    const updatedData = {
-                        id: document.getElementById('editStudentId').value,
-                        name: document.getElementById('editStudentName').value,
+                    const id = document.getElementById('editStudentId').value;
+                    const data = {
+                        fullName: document.getElementById('editStudentName').value,
                         email: document.getElementById('editStudentEmail').value,
                         section: document.getElementById('editStudentSection').value,
                         year: document.getElementById('editStudentYear').value,
                         status: document.getElementById('editStudentStatus').value
                     };
 
-                    // Update the table row if found
-                    if (currentEditingStudentRow) {
-                        // Update data attributes
-                        currentEditingStudentRow.dataset.name = updatedData.name;
-                        currentEditingStudentRow.dataset.email = updatedData.email;
-                        currentEditingStudentRow.dataset.section = updatedData.section;
-                        currentEditingStudentRow.dataset.year = updatedData.year;
-
-                        // Update name in the table
-                        const nameElement = currentEditingStudentRow.querySelector('.font-semibold');
-                        if (nameElement) {
-                            nameElement.textContent = updatedData.name;
+                    try {
+                        const res = await fetch(`/hos/student/update/${id}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(data)
+                        });
+                        const result = await res.json();
+                        
+                        if (result.success) {
+                            alert('Student updated successfully!');
+                            window.location.reload();
+                        } else {
+                            alert('Error: ' + result.message);
                         }
-
-                        // Update email in the table
-                        const emailElement = currentEditingStudentRow.querySelector('.text-xs.text-gray-500');
-                        if (emailElement) {
-                            emailElement.textContent = updatedData.email;
-                        }
-
-                        // Update status badge
-                        const statusBadge = currentEditingStudentRow.querySelector('.inline-flex.items-center.gap-1\\.5');
-                        if (statusBadge && updatedData.status !== 'Active') {
-                            let badgeClass = 'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400 border border-gray-100 dark:border-gray-800';
-                            let dotClass = 'bg-gray-500';
-                            let statusText = updatedData.status;
-
-                            if (updatedData.status === 'Suspended') {
-                                badgeClass = 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border border-red-100 dark:border-red-800';
-                                dotClass = 'bg-red-500';
-                            }
-
-                            statusBadge.className = `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${badgeClass}`;
-                            statusBadge.innerHTML = `<span class="flex h-1.5 w-1.5 rounded-full ${dotClass}"></span> ${statusText}`;
-                        }
+                    } catch (err) {
+                        console.error('Update failed:', err);
+                        alert('Failed to update student profile.');
                     }
-
-                    // Close modal
-                    editStudentModal.classList.add('hidden');
-                    currentEditingStudentRow = null;
-
-                    // Show success message
-                    alert('Student profile updated successfully!');
                 });
             }
 

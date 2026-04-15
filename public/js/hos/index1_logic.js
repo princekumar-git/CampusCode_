@@ -31,6 +31,12 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 
+    // Default to "All Problems" tab on load
+    const defaultTab = document.querySelector('[data-tab="all-problems"]');
+    if (defaultTab) {
+        defaultTab.click();
+    }
+
     const btnCreateProblem = document.getElementById('btn-create-problem');
     const problemsListContainer = document.getElementById('problems-list-container');
     const problemFormView = document.getElementById('problem-form-view');
@@ -183,7 +189,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const actionsCell = clonedRow.querySelector('td:last-child > div');
         if (actionsCell) {
             actionsCell.innerHTML = `
-                <a href="/hos/problem_page?id=${problemId}"
+                <a href="/hos/view-problem/${problemId}"
                     class="bg-primary-50 text-primary-600 hover:bg-primary-100 px-3 py-1 rounded-md text-xs font-medium transition-colors">View</a>
                 <button
                     class="text-red-500 hover:text-red-700 transition-colors flex items-center gap-1 text-xs font-medium bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded ml-2"

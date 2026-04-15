@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HOS - View Discussion</title>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/css/shared.css">
+    <link rel="stylesheet" href="/css/faculty/style.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ["Poppins", "sans-serif"] },
+                    colors: {
+                        primary: { 50: "#E7F0FA", 100: "#D0E1F5", 200: "#7BA4D0", 300: "#4D84C0", 400: "#2E5E99", 500: "#1E4A7A", 600: "#0D2440" },
+                        dark: { bg: "#111827", card: "#1F2937", text: "#F9FAFB", border: "#374151" }
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        .filter-btn.active { background-color: #e7f0fa; color: #1e4a7a; border-color: #7ba4d0; }
+        .dark .filter-btn.active { background-color: #1e4a7a; color: #fff; border-color: #60a5fa; }
+        .topic-card { cursor: pointer; transition: all .2s ease; }
+        .topic-card.selected { border-color: #3b82f6; background-color: #eff6ff; box-shadow: 0 4px 10px rgba(59,130,246,.08); }
+        .dark .topic-card.selected { background-color: rgba(30,58,138,.2); }
+    </style>
+</head>
+
+<body class="bg-gray-50 dark:bg-gray-900 min-h-screen font-sans transition-colors duration-200 text-gray-800 dark:text-gray-200">
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <%- include('../partials/hos_nav') %>
+
+        <div class="flex-1 overflow-y-auto relative">
+            <!-- Header -->
+            <%- include('../partials/hos_header') %>
+
+            <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div id="loadingState" class="py-20 flex flex-col items-center justify-center">
+            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-primary-500 dark:text-primary-400 mb-4"></i>
+            <p class="text-gray-500 dark:text-gray-400 font-medium">Loading thread...</p>
+        </div>
+
+        <div id="threadContentArea" class="hidden">
+            <!-- Back button embedded gracefully -->
+            <div class="mb-4 flex items-center">
+                <a href="/hos/forum" class="text-sm text-gray-500 dark:text-gray-400 hover:text-primary-500 flex items-center gap-2 transition-colors">
+                    <i class="fa-solid fa-arrow-left"></i> Back to Community
+                </a>
+            </div>
+
+            <article class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 mb-6 transition-colors duration-200 relative">
+                
+                <div class="flex items-start justify-between gap-4 mb-6">
+                    <div class="flex items-center gap-3">
+                        <div id="opAvatar" class="w-12 h-12 rounded-full bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 flex items-center justify-center font-bold text-lg border border-primary-200 dark:border-primary-800 shadow-sm">
+                            U
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 id="opName" class="font-bold text-gray-900 dark:text-white">Loading User...</h3>
+                                <span id="opRole" class="text-[10px] bg-primary-50 text-primary-600 border border-primary-200 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-800 px-2 py-0.5 rounded font-bold uppercase tracking-wider">User</span>
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-2">
+                                <span id="opDate">Just now</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="threadCategory" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs font-semibold text-gray-600 dark:text-gray-300">
+                        <i class="fa-solid fa-tag"></i> <span id="opTopic">General</span>
+                    </div>
+                </div>
+
+                <h1 id="threadTitle" class="text-2xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
+                    Loading Title...
+                </h1>
+                
+                <div id="threadBody" class="prose dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed text-sm sm:text-base">
+                    </div>
+
+                <div class="mt-8 pt-5 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <button id="upvoteBtn" class="flex items-center gap-2 text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors font-semibold text-sm bg-gray-50 dark:bg-gray-700/50 hover:bg-primary-50 dark:hover:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                            <i class="fa-solid fa-arrow-up"></i>
+                            <span id="upvoteCount">0</span>
+                        </button>
+                        <button id="downvoteBtn" class="flex items-center gap-2 text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors font-semibold text-sm bg-gray-50 dark:bg-gray-700/50 hover:bg-primary-50 dark:hover:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                            <i class="fa-solid fa-arrow-down"></i>
+                            <span id="downvoteCount">0</span>
+                        </button>
+                    </div>
+                    <button id="deleteThreadBtn" class="hidden flex items-center gap-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors font-semibold text-sm bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </div>
+            </article>
+
+            <div class="mb-6 flex items-center gap-3">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    <i class="fa-solid fa-comments text-primary-500"></i>
+                    <span id="replyCountTitle">0 Replies</span>
+                </h3>
+                <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"></div>
+            </div>
+
+            <div id="repliesContainer" class="space-y-4 mb-8">
+                </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sm:p-8 transition-colors duration-200">
+                <h4 class="text-base font-bold text-gray-800 dark:text-white mb-4">Add your reply</h4>
+                <form id="replyForm" class="space-y-4">
+                    <div class="border border-gray-300 dark:border-gray-600 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-primary-400 focus-within:border-transparent transition-all bg-white dark:bg-gray-700">
+                        <textarea id="replyContent" rows="4" required placeholder="Write your response here. Be respectful and helpful..." 
+                            class="w-full px-4 py-3 bg-transparent text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 outline-none resize-y border-0 focus:ring-0"></textarea>
+                        <div class="bg-gray-50 dark:bg-gray-700/80 px-4 py-3 border-t border-gray-200 dark:border-gray-600 flex justify-between items-center">
+                            <span class="text-xs font-medium text-gray-500 dark:text-gray-400"><i class="fa-brands fa-markdown mr-1"></i> Markdown supported</span>
+                            <button type="submit" id="submitReplyBtn" class="px-5 py-2 rounded-xl text-sm font-semibold bg-primary-500 text-white hover:bg-primary-600 shadow-sm transition-all flex justify-center items-center gap-2">
+                                <i class="fa-solid fa-paper-plane"></i> Post Reply
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
+    <script src="/js/hod/shell.js"></script>
+    <script src="/js/forum.js"></script>
+</body>
+</html>

@@ -4,6 +4,7 @@ const fs = require('fs');
 const multer = require('multer');
 const { requireRole } = require('../middleware/auth');
 const { checkScope } = require('../middleware/authMiddleware');
+const sanitizeHtml = require('sanitize-html');
 
 module.exports = (db) => {
     const router = express.Router();
@@ -100,6 +101,20 @@ module.exports = (db) => {
         }
     });
 
+    router.get('/hos/forum', requireRole('hos'), checkScope, (req, res) => {
+        res.render('hos/forum.html', { user: req.session.user, currentPage: 'community', pageTitle: 'Community' });
+    });
+
+    router.get('/hos/forum/create', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('hos/forum-create.html', { user: req.session.user, currentPage: 'community', pageTitle: 'Create Discussion' });
+    });
+
+    router.get('/hos/forum/thread', requireRole(['faculty', 'hos', 'hod']), checkScope, (req, res) => {
+        res.render('hos/forum-thread.html', { user: req.session.user, currentPage: 'community', pageTitle: 'View Discussion' });
+    });
+
+    router.get('/hos/community', requireRole('hos'), checkScope, (req, res) => res.redirect('/hos/forum'));
+
     // HOS Dashboard
     router.get('/hos/dashboard', requireRole('hos'), checkScope, async (req, res) => {
         try {
@@ -191,6 +206,19 @@ module.exports = (db) => {
                 trendCounts.push(row ? row.count : 0);
             }
 
+            const getTimeAgo = (date) => {
+                if (!date) return "Unknown";
+                const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+                if (seconds < 60) return "Just now";
+                const minutes = Math.floor(seconds / 60);
+                if (minutes < 60) return `${minutes}m ago`;
+                const hours = Math.floor(minutes / 60);
+                if (hours < 24) return `${hours}h ago`;
+                const days = Math.floor(hours / 24);
+                if (days < 7) return `${days}d ago`;
+                return new Date(date).toLocaleDateString();
+            };
+
             // Recent Activity (last 5 problems + contests, any status)
             const recentProblems = await new Promise((resolve, reject) => {
                 db.all(`SELECT p.title, p.status, p.createdAt, 'problem' as type, u.fullName as author FROM problems p JOIN account_users u ON p.faculty_id = u.id WHERE (p.subject IN (${subjectPlaceholders}) OR p.faculty_id = ?) ORDER BY p.createdAt DESC LIMIT 5`, [...subjects, hosId], (err, rows) => {
@@ -204,7 +232,14 @@ module.exports = (db) => {
             });
             const recentActivity = [...recentProblems, ...recentContestsAll]
                 .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                .slice(0, 5);
+                .slice(0, 5)
+                .map(item => ({
+                    text: `${item.type === 'problem' ? 'Submitted' : 'Created'} ${item.type} "${item.title}" by ${item.author}`,
+                    time: getTimeAgo(item.createdAt),
+                    color: item.type === 'problem' 
+                        ? (item.status === 'accepted' ? 'green' : (item.status === 'pending' ? 'yellow' : 'blue'))
+                        : 'purple'
+                }));
 
             res.render('hos/dashboard.html', {
                 user: req.session.user,
@@ -269,7 +304,49 @@ module.exports = (db) => {
         } catch (e) { res.status(500).send(e.message); }
     });
 
-    // Pending Contests Page
+    // Pending Question View (full-page review)
+    router.get('/hos/pending-question/:id', requireRole('hos'), checkScope, async (req, res) => {
+        const problemId = parseInt(req.params.id, 10);
+        if (!problemId) return res.status(400).send('Missing or invalid problem ID.');
+        try {
+            const hosId = req.session.user.id;
+            const college = req.session.user.collegeName;
+            const subjects = await getAssignedSubjects(hosId, college);
+            const facultyIds = await getFacultyUnderHos(hosId, college, subjects);
+
+            const problem = await new Promise((resolve, reject) => {
+                db.get(
+                    `SELECT p.*, u.fullName as facultyName
+                     FROM problems p
+                     LEFT JOIN account_users u ON p.faculty_id = u.id
+                     WHERE p.id = ?`,
+                    [problemId],
+                    (err, row) => err ? reject(err) : resolve(row)
+                );
+            });
+
+            if (!problem) return res.status(404).send('Question not found.');
+
+            // Access check: must belong to HOS's faculty scope or be the HOS's own problem
+            const isOwnProblem = problem.faculty_id === hosId;
+            const isFacultyScope = facultyIds.includes(problem.faculty_id);
+            const isSubjectScope = subjects.length === 0 || subjects.includes(problem.subject);
+            if (!isOwnProblem && !isFacultyScope && !isSubjectScope) {
+                return res.status(403).send('Access denied: This question is outside your scope.');
+            }
+
+            res.render('hos/pending_question_view.html', {
+                user: req.session.user,
+                problem,
+                currentPage: 'pending_questions'
+            });
+        } catch (e) {
+            console.error('HOS pending-question view error:', e);
+            res.status(500).send(e.message);
+        }
+    });
+
+
     router.get('/hos/pending-contests', requireRole('hos'), checkScope, async (req, res) => {
         try {
             const hosId = req.session.user.id;
@@ -344,6 +421,68 @@ module.exports = (db) => {
                 });
             });
         } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+    });
+
+    // Bulk Verify Questions (approve / reject)
+    router.post('/hos/bulk-verify', requireRole('hos'), async (req, res) => {
+        const { questionIds, action, comments } = req.body;
+        const hosId = req.session.user.id;
+
+        if (!Array.isArray(questionIds) || questionIds.length === 0) {
+            return res.status(400).json({ success: false, error: 'No question IDs provided.' });
+        }
+        if (!['approve', 'reject'].includes(action)) {
+            return res.status(400).json({ success: false, error: 'Invalid action. Must be "approve" or "reject".' });
+        }
+
+        try {
+            const subjects = await getAssignedSubjects(hosId);
+            const newStatus = action === 'approve' ? 'accepted' : 'rejected';
+
+            let successCount = 0;
+            const errors = [];
+
+            for (const rawId of questionIds) {
+                const problemId = parseInt(rawId, 10);
+                if (!problemId) continue;
+
+                await new Promise((resolve) => {
+                    db.get(`SELECT subject FROM problems WHERE id = ?`, [problemId], (err, row) => {
+                        if (err || !row) { errors.push(problemId); return resolve(); }
+                        // Scope check: HOS can approve their own problems or problems in their subjects
+                        if (subjects.length > 0 && !subjects.includes(row.subject)) {
+                            errors.push(problemId); return resolve();
+                        }
+
+                        let updateSql, params;
+                        if (action === 'approve') {
+                            updateSql = `UPDATE problems SET status = ?, hod_comments = ?, hos_verified = 1, is_public = 1, visibility_scope = 'college', scope = 'college' WHERE id = ?`;
+                            params = [newStatus, comments || '', problemId];
+                        } else {
+                            updateSql = `UPDATE problems SET status = ?, hod_comments = ? WHERE id = ?`;
+                            params = [newStatus, comments || '', problemId];
+                        }
+
+                        db.run(updateSql, params, function(runErr) {
+                            if (runErr) { errors.push(problemId); } else { successCount++; }
+                            resolve();
+                        });
+                    });
+                });
+            }
+
+            if (successCount === 0) {
+                return res.status(403).json({ success: false, error: 'No questions were updated. Check subject scope permissions.' });
+            }
+
+            const message = `${successCount} question(s) ${action === 'approve' ? 'approved' : 'rejected'} successfully.` +
+                (errors.length ? ` (${errors.length} skipped due to access restrictions)` : '');
+            res.json({ success: true, message });
+
+        } catch (e) {
+            console.error('HOS bulk-verify error:', e);
+            res.status(500).json({ success: false, error: e.message });
+        }
     });
 
     // Approve Contest POST Route
@@ -424,27 +563,26 @@ module.exports = (db) => {
     });
 
     // HOS: Problem View Page (IDE-like view)
-    router.get('/hos/problem_page', requireRole('hos'), checkScope, async (req, res) => {
-        const problemId = parseInt(req.query.id, 10);
-        if (!problemId) return res.status(400).send('Missing problem ID.');
-        try {
-            db.get(
-                `SELECT p.*, u.fullName as facultyName, u.role as creatorRole
-                 FROM problems p
-                 LEFT JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id
-                 WHERE p.id = ?`,
-                [problemId],
-                (err, problem) => {
-                    if (err) return res.status(500).send(err.message);
-                    if (!problem) return res.status(404).send('Problem not found.');
-                    res.render('hos/problem_page.html', {
-                        user: req.session.user,
-                        problem,
-                        currentPage: 'problem'
-                    });
-                }
-            );
-        } catch (e) { res.status(500).send(e.message); }
+    router.get('/hos/view-problem/:id', requireRole('hos'), checkScope, async (req, res) => {
+        const problemId = req.params.id;
+        db.get('SELECT * FROM problems WHERE id = ?', [problemId], (err, problem) => {
+            if (err) return res.status(500).send('Database error');
+            if (!problem) return res.status(404).send('Problem not found');
+            if (problem.description) {
+                problem.description = sanitizeHtml(problem.description, {
+                    allowedTags: sanitizeHtml.defaults.allowedTags.concat([ 'img', 'u', 's', 'pre', 'code' ]),
+                    allowedAttributes: Object.assign({}, sanitizeHtml.defaults.allowedAttributes, {
+                        '*': ['style', 'class'],
+                        'img': ['src', 'alt', 'width', 'height']
+                    })
+                });
+            }
+            res.render('hos/view-problem.html', {
+                user: req.session.user,
+                problem: problem,
+                currentPage: 'problem'
+            });
+        });
     });
 
     router.get('/hos/contest', requireRole('hos'), checkScope, async (req, res) => {
@@ -827,7 +965,7 @@ module.exports = (db) => {
         const department = req.session.user.department;
         try {
             const students = await new Promise((resolve, reject) => {
-                db.all(`SELECT id, fullName, email, course, department, joiningDate 
+                db.all(`SELECT id, fullName, email, course, department, joiningDate, status, year, section 
                         FROM account_users 
                         WHERE role = 'student' AND collegeName = ? AND department = ? 
                         ORDER BY fullName ASC`,
@@ -1243,6 +1381,24 @@ module.exports = (db) => {
         }
     });
 
+    // ⭐ HOS: View Detailed Student Profile Page
+    router.get('/hos/view_student', requireRole('hos'), (req, res) => {
+        res.render('hos/view_student.html', { 
+            user: req.session.user, 
+            currentPage: 'student',
+            queryId: req.query.id
+        });
+    });
+
+    // ⭐ HOS: View Detailed Faculty Profile Page
+    router.get('/hos/view_faculty', requireRole('hos'), (req, res) => {
+        res.render('hos/view_faculty.html', { 
+            user: req.session.user, 
+            currentPage: 'faculty',
+            queryId: req.query.id
+        });
+    });
+
     // Pending Contests - Full Dynamic Data
     router.get('/hos/pending-contests', requireRole('hos'), checkScope, async (req, res) => {
         try {
@@ -1261,7 +1417,12 @@ module.exports = (db) => {
             const facultyPh = facultyIds.map(() => '?').join(',');
 
             const contests = await new Promise((resolve, reject) => {
-                db.all(`SELECT c.id, c.title, c.subject, c.status, c.startDate as start_date, c.endDate as end_date, c.createdAt, c.department, c.hos_verified, c.hod_verified, u.fullName as faculty, u.role as creatorRole
+                db.all(`SELECT c.id, c.title, c.subject, c.status, c.startDate as start_date, c.endDate as end_date, 
+                               c.createdAt, c.department, c.hos_verified, c.hod_verified, 
+                               c.duration, c.deadline, c.registrationEndDate, c.eligibility, 
+                               c.description, c.rulesAndDescription, c.guidelines, c.contest_class,
+                               c.prize, c.visibility_scope,
+                               u.fullName as faculty, u.role as creatorRole
                     FROM contests c JOIN account_users u ON c.createdBy = u.id
                     WHERE c.status = 'pending'
                       AND COALESCE(c.hos_verified, 0) = 0
@@ -1469,7 +1630,7 @@ module.exports = (db) => {
                 if (String(infoRow.creatorRole || '').toLowerCase() !== 'faculty') {
                     return res.json({ success: true, message: 'HOS approval is only required for faculty-created contests.' });
                 }
-                db.run(`UPDATE contests SET hos_verified = 1 WHERE id = ?`, [id], function(err) {
+                db.run(`UPDATE contests SET hos_verified = 1, hos_verified_by = ?, hos_verified_at = ? WHERE id = ?`, [user.id, new Date().toISOString(), id], function(err) {
                     if (err) return res.status(500).json({ success: false, message: err.message });
                     if (infoRow.hod_verified === 1) {
                         db.run(
@@ -1512,10 +1673,13 @@ module.exports = (db) => {
             const status = 'accepted'; // HOS auto-approves
             const scope = visibility_scope || 'global';
 
+            const finalDescription = String(description || '').trim();
+            const finalTags = String(tags || '').trim();
+
             db.run(
                 `INSERT INTO problems (title, description, subject, difficulty, points, input_format, output_format, constraints, sample_input, sample_output, faculty_id, is_public, department, visibility_scope, status, tags, created_by, hos_verified, approved_by, approved_at) 
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [title, description, subject, difficulty, points, input_format || '', output_format || '', constraints || '', sample_input || '', sample_output || '', user.id, 1, user.department, scope, status, tags || '', user.id, 1, user.id, new Date().toISOString()],
+                [title, finalDescription, subject, difficulty, points, input_format || '', output_format || '', constraints || '', sample_input || '', sample_output || '', user.id, 1, user.department, scope, status, finalTags, user.id, 1, user.id, new Date().toISOString()],
                 function (err) {
                     if (err) return res.status(500).json({ success: false, message: err.message });
                     const problemId = this.lastID;
@@ -1557,9 +1721,12 @@ module.exports = (db) => {
             const getPoints = (diff) => ({ 'easy': 5, 'medium': 10, 'hard': 15 }[String(diff || 'easy').toLowerCase()] || 5);
             const points = getPoints(difficulty);
 
+            const finalDesc = String(description || '').trim();
+            const finalTags = String(tags || '').trim();
+
             db.run(
                 `UPDATE problems SET title=?, description=?, subject=?, difficulty=?, points=?, input_format=?, output_format=?, constraints=?, sample_input=?, sample_output=?, tags=?, visibility_scope=? WHERE id=?`,
-                [title, description, subject, difficulty, points, input_format, output_format, constraints, sample_input, sample_output, tags, visibility_scope || 'global', problemId],
+                [title, finalDesc, subject, difficulty, points, input_format || '', output_format || '', constraints || '', sample_input || '', sample_output || '', finalTags, visibility_scope || 'global', problemId],
                 function (err) {
                     if (err) return res.status(500).json({ success: false, message: err.message });
 
@@ -1628,7 +1795,27 @@ module.exports = (db) => {
         });
     });
 
+    // HOS: Update Student Profile
+    router.post('/hos/student/update/:id', requireRole('hos'), (req, res) => {
+        const { fullName, email, year, section, status } = req.body;
+        const studentId = req.params.id;
+        const user = req.session.user;
+
+        db.run(
+            `UPDATE users 
+             SET fullName = ?, email = ?, year = ?, section = ?, status = ? 
+             WHERE id = ? AND collegeName = ? AND role = 'student'`,
+            [fullName, email, year, section, String(status || 'active').toLowerCase(), studentId, user.collegeName],
+            function(err) {
+                if (err) return res.status(500).json({ success: false, message: err.message });
+                if (this.changes === 0) return res.status(404).json({ success: false, message: 'Student not found or unauthorized' });
+                res.json({ success: true, message: 'Student updated successfully!' });
+            }
+        );
+    });
+
     return router;
+
 };
 
 

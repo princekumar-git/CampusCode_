@@ -20,6 +20,12 @@
             }
         };
     </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+    </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 font-sans overflow-hidden">
 <div class="flex h-screen">
@@ -28,55 +34,171 @@
     <div class="flex-1 flex flex-col overflow-hidden">
         <%- include('../partials/faculty_header') %>
 
-        <main class="flex-1 px-8 py-6 overflow-y-auto">
+        <main class="flex-1 px-8 py-6 overflow-y-auto custom-scrollbar">
             <div class="grid grid-cols-12 gap-6">
-                <div class="col-span-12 lg:col-span-3 bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center">
-                    <div class="w-32 h-32 rounded-3xl border-4 border-primary-50 dark:border-gray-700 shadow overflow-hidden bg-gray-100">
-                        <img class="w-full h-full object-cover" src="https://ui-avatars.com/api/?name=<%= encodeURIComponent(user.fullName || 'Faculty') %>&background=2E5E99&color=fff" />
+                <!-- Sidebar Profile Card -->
+                <div class="col-span-12 lg:col-span-3 space-y-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center">
+                        <div class="w-32 h-32 rounded-3xl border-4 border-primary-50 dark:border-gray-700 shadow-lg overflow-hidden bg-gray-100 relative group">
+                            <img class="w-full h-full object-cover" src="https://ui-avatars.com/api/?name=<%= encodeURIComponent(user.fullName || 'Faculty') %>&background=2E5E99&color=fff&size=200" />
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
+                                <i class="fas fa-camera text-white text-xl"></i>
+                            </div>
+                        </div>
+                        <h2 class="mt-8 text-xl font-bold dark:text-white text-center"><%= user.fullName || user.name || 'Faculty' %></h2>
+                        <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mt-1"><%= user.post || 'Faculty Member' %></p>
+                        
+                        <div class="mt-8 w-full space-y-4 border-t border-gray-100 dark:border-gray-700 pt-6">
+                            <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fas fa-university text-primary-400 w-5"></i><span><%= user.collegeName || 'N/A' %></span></div>
+                            <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fas fa-envelope text-primary-400 w-5"></i><span><%= user.email || 'N/A' %></span></div>
+                            <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fas fa-layer-group text-primary-400 w-5"></i><span><%= user.department || 'N/A' %></span></div>
+                            <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fas fa-calendar-alt text-primary-400 w-5"></i><span>Joined: <%= user.joiningDate || 'N/A' %></span></div>
+                            <% if (user.github_link) { %>
+                                <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fab fa-github text-primary-400 w-5"></i><a href="<%= user.github_link %>" target="_blank" class="hover:text-primary-500 truncate"><%= user.github_link.split('/').pop() %></a></div>
+                            <% } %>
+                        </div>
+                        
+                        <div class="mt-8 w-full">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Expertise Badges</p>
+                            <div class="flex flex-wrap gap-2">
+                                <% topSubjects.forEach(sub => { %>
+                                    <span class="px-3 py-1 rounded-full bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-300 text-[10px] font-bold border border-primary-100 dark:border-primary-800 uppercase"><%= sub.subject %></span>
+                                <% }) %>
+                                <% if(topSubjects.length === 0) { %> <span class="text-xs text-gray-400 italic">No subjects yet</span> <% } %>
+                            </div>
+                        </div>
+
+                        <div class="mt-10 w-full space-y-3">
+                            <a href="/faculty/settings" class="block w-full text-center py-3 rounded-2xl border border-gray-200 dark:border-gray-700 dark:text-gray-300 font-bold text-xs hover:bg-gray-50 dark:hover:bg-gray-700 transition-all">EDIT PROFILE</a>
+                        </div>
                     </div>
-                    <h2 class="mt-8 text-xl font-bold dark:text-white"><%= user.fullName || user.name || 'Faculty' %></h2>
-                    <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mt-1"><%= user.post || 'Faculty Member' %></p>
-                    <div class="mt-8 w-full space-y-4 border-t border-gray-100 dark:border-gray-700 pt-6">
-                        <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fas fa-university text-primary-400 w-5"></i><span><%= user.collegeName || 'N/A' %></span></div>
-                        <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fas fa-envelope text-primary-400 w-5"></i><span><%= user.email || 'N/A' %></span></div>
-                        <div class="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400"><i class="fas fa-layer-group text-primary-400 w-5"></i><span><%= user.department || 'N/A' %></span></div>
-                    </div>
-                    <div class="mt-10 w-full space-y-3">
-                        <a href="/faculty/settings" class="block w-full text-center py-3 rounded-2xl border border-gray-200 dark:border-gray-700 dark:text-gray-300 font-bold text-xs hover:bg-gray-50 dark:hover:bg-gray-700">ACCOUNT SETTINGS</a>
-                        <a href="/auth/logout" class="block w-full text-center py-3 rounded-2xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 font-bold text-xs hover:bg-red-100 dark:hover:bg-red-900/30">LOG OUT</a>
+                    
+                    <!-- Top Performers Card -->
+                    <div class="bg-white dark:bg-gray-800 rounded-3xl border border-gray-200 dark:border-gray-700 p-6">
+                        <h3 class="text-sm font-bold dark:text-white mb-4 flex items-center gap-2"><i class="fas fa-star text-yellow-400"></i> Top Performers</h3>
+                        <div class="space-y-4">
+                            <% topPerformers.forEach((p, i) => { %>
+                                <div class="flex items-center justify-between group">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-500"><%= i + 1 %></div>
+                                        <div class="text-xs font-semibold dark:text-gray-200 truncate max-w-[100px]"><%= p.fullName %></div>
+                                    </div>
+                                    <div class="text-[10px] font-bold text-primary-500 bg-primary-50 dark:bg-primary-900/20 px-2 py-0.5 rounded-full"><%= p.count %> Solved</div>
+                                </div>
+                            <% }) %>
+                            <% if(topPerformers.length === 0) { %> <p class="text-xs text-center text-gray-400 py-4">No solvers yet</p> <% } %>
+                        </div>
                     </div>
                 </div>
 
-                <div class="col-span-12 lg:col-span-9 flex flex-col gap-6">
+                <!-- Main Content Area -->
+                <div class="col-span-12 lg:col-span-9 space-y-6">
+                    <!-- Stat Cards -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4">
+                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4 hover:shadow-lg transition-all">
                             <div class="p-3 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-blue-600"><i class="fas fa-user-graduate text-xl"></i></div>
-                            <div><p class="text-xs font-bold text-gray-400 uppercase">Students</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.students || 0 %></p></div>
+                            <div><p class="text-xs font-bold text-gray-400 uppercase">Colleagues</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.students || 0 %></p></div>
                         </div>
-                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4">
+                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4 hover:shadow-lg transition-all">
                             <div class="p-3 rounded-2xl bg-purple-50 dark:bg-purple-900/20 text-purple-600"><i class="fas fa-code text-xl"></i></div>
-                            <div><p class="text-xs font-bold text-gray-400 uppercase">Problems</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.problems || 0 %></p></div>
+                            <div><p class="text-xs font-bold text-gray-400 uppercase">Library Size</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.problems || 0 %></p></div>
                         </div>
-                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4">
-                            <div class="p-3 rounded-2xl bg-green-50 dark:bg-green-900/20 text-green-600"><i class="fas fa-book text-xl"></i></div>
-                            <div><p class="text-xs font-bold text-gray-400 uppercase">Active Students</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.activeStudents || 0 %></p></div>
+                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4 hover:shadow-lg transition-all">
+                            <div class="p-3 rounded-2xl bg-green-50 dark:bg-green-900/20 text-green-600"><i class="fas fa-bolt text-xl"></i></div>
+                            <div><p class="text-xs font-bold text-gray-400 uppercase">Engagement</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.activeStudents || 0 %></p></div>
                         </div>
-                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4">
-                            <div class="p-3 rounded-2xl bg-orange-50 dark:bg-orange-900/20 text-orange-600"><i class="fas fa-trophy text-xl"></i></div>
-                            <div><p class="text-xs font-bold text-gray-400 uppercase">Contests</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.contests || 0 %></p></div>
+                        <div class="bg-white dark:bg-gray-800 rounded-[2rem] p-6 border border-gray-200 dark:border-gray-700 flex items-center gap-4 hover:shadow-lg transition-all">
+                            <div class="p-3 rounded-2xl bg-orange-50 dark:bg-orange-900/20 text-orange-600"><i class="fas fa-paper-plane text-xl"></i></div>
+                            <div><p class="text-xs font-bold text-gray-400 uppercase">Active Runs</p><p class="text-2xl font-black dark:text-white"><%= profileStats?.contests || 0 %></p></div>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[380px]">
-                        <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-200 dark:border-gray-700">
-                            <h3 class="font-bold text-gray-800 dark:text-white mb-6">Platform Usage</h3>
-                            <div class="relative h-[270px]"><canvas id="usageChart"></canvas></div>
+                    <!-- Unified Academic Scope -->
+                    <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                        <div class="flex items-center justify-between mb-8 pb-4 border-b border-gray-100 dark:border-gray-700">
+                            <h3 class="font-bold text-gray-800 dark:text-white flex items-center gap-3">
+                                <span class="w-2 h-8 bg-primary-500 rounded-full"></span>
+                                Academic Load Scope
+                            </h3>
+                            <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
+                                <i class="fas fa-shield-alt text-[10px] text-gray-400"></i>
+                                <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">System Assigned</span>
+                            </div>
                         </div>
-                        <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-200 dark:border-gray-700">
-                            <h3 class="font-bold text-gray-800 dark:text-white mb-6">Performance Matrix</h3>
-                            <div class="relative h-[270px]"><canvas id="performanceChart"></canvas></div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div class="group">
+                                <div class="flex items-center justify-between mb-4">
+                                    <p class="text-xs font-bold text-gray-400 group-hover:text-primary-500 transition-colors uppercase tracking-widest">Active Subjects</p>
+                                    <span class="w-6 h-6 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] font-black flex items-center justify-center border border-indigo-100 dark:border-indigo-800"><%= user.assignedSubjects ? user.assignedSubjects.length : 0 %></span>
+                                </div>
+                                <div class="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto custom-scrollbar pr-1">
+                                    <% if (!user.assignedSubjects || user.assignedSubjects.length === 0) { %>
+                                        <p class="text-xs text-gray-400 italic">No subjects assigned yet.</p>
+                                    <% } else { user.assignedSubjects.forEach(subject => { %>
+                                        <div class="px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 text-xs font-medium border border-transparent hover:border-indigo-200 dark:hover:border-indigo-900/40 transition-all flex items-center gap-2">
+                                            <i class="fas fa-book text-[10px] text-indigo-400 opacity-60"></i> <%= subject %>
+                                        </div>
+                                    <% }); } %>
+                                </div>
+                            </div>
+
+                            <div class="group">
+                                <div class="flex items-center justify-between mb-4">
+                                    <p class="text-xs font-bold text-gray-400 group-hover:text-primary-500 transition-colors uppercase tracking-widest">Assigned Years</p>
+                                    <% 
+                                     let py = [];
+                                     try { py = user.assignedYears ? user.assignedYears.split(',').filter(y => y.trim()) : []; } catch(e) {}
+                                    %>
+                                    <span class="w-6 h-6 rounded-lg bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-black flex items-center justify-center border border-blue-100 dark:border-blue-800"><%= py.length %></span>
+                                </div>
+                                <div class="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto custom-scrollbar pr-1">
+                                    <% if (py.length === 0) { %>
+                                        <p class="text-xs text-gray-400 italic">No years assigned yet.</p>
+                                    <% } else { py.forEach(y => { %>
+                                        <div class="px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 text-xs font-medium border border-transparent hover:border-blue-200 dark:hover:border-blue-900/40 transition-all flex items-center gap-2">
+                                            <i class="fas fa-calendar-alt text-[10px] text-blue-400 opacity-60"></i> <%= y.trim() %>
+                                        </div>
+                                    <% }); } %>
+                                </div>
+                            </div>
+
+                            <div class="group">
+                                <div class="flex items-center justify-between mb-4">
+                                    <p class="text-xs font-bold text-gray-400 group-hover:text-primary-500 transition-colors uppercase tracking-widest">Active Sections</p>
+                                    <% 
+                                     let ps = [];
+                                     try { ps = user.assignedSections ? user.assignedSections.split(',').filter(s=>s.trim()) : []; } catch(e) {}
+                                    %>
+                                    <span class="w-6 h-6 rounded-lg bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] font-black flex items-center justify-center border border-purple-100 dark:border-purple-800"><%= ps.length %></span>
+                                </div>
+                                <div class="flex flex-wrap gap-2 max-h-[120px] overflow-y-auto custom-scrollbar pr-1">
+                                    <% if (ps.length === 0) { %>
+                                        <p class="text-xs text-gray-400 italic">No sections assigned yet.</p>
+                                    <% } else { ps.forEach(s => { %>
+                                        <div class="px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-900/40 text-gray-700 dark:text-gray-300 text-xs font-medium border border-transparent hover:border-purple-200 dark:hover:border-purple-900/40 transition-all flex items-center gap-2">
+                                            <i class="fas fa-users text-[10px] text-purple-400 opacity-60"></i> <%= s.trim() %>
+                                        </div>
+                                    <% }); } %>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <!-- Charts Section -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden">
+                            <div class="absolute top-0 right-0 p-8 opacity-10"><i class="fas fa-chart-line text-6xl"></i></div>
+                            <h3 class="font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><i class="fas fa-analytics text-primary-500"></i> Distribution</h3>
+                            <div class="relative h-[300px]"><canvas id="usageChart"></canvas></div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 rounded-[2.5rem] p-8 border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden">
+                            <div class="absolute top-0 right-0 p-8 opacity-10"><i class="fas fa-bullseye text-6xl"></i></div>
+                            <h3 class="font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2"><i class="fas fa-radar text-primary-500"></i> Proficiency Matrix</h3>
+                            <div class="relative h-[300px]"><canvas id="performanceChart"></canvas></div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </main>
@@ -85,6 +207,10 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    const labelColor = isDark ? '#94a3b8' : '#64748b';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
     const usageCtx = document.getElementById('usageChart');
     const perfCtx = document.getElementById('performanceChart');
 
@@ -92,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         new Chart(usageCtx, {
             type: 'bar',
             data: {
-                labels: ['Students', 'Problems', 'Active Students', 'Contests'],
+                labels: ['Stud.', 'Prob.', 'Act.', 'Cont.'],
                 datasets: [{
                     label: 'Count',
                     data: [
@@ -101,10 +227,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         <%= profileStats?.activeStudents || 0 %>,
                         <%= profileStats?.contests || 0 %>
                     ],
-                    backgroundColor: ['#60a5fa', '#a78bfa', '#34d399', '#fb923c']
+                    backgroundColor: ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b'],
+                    borderRadius: 12,
+                    barThickness: 40
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { grid: { color: gridColor }, ticks: { color: labelColor, font: { size: 10 } } },
+                    x: { grid: { display: false }, ticks: { color: labelColor, font: { size: 10, weight: 'bold' } } }
+                }
+            }
         });
     }
 
@@ -114,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
             data: {
                 labels: ['Coverage', 'Engagement', 'Contests', 'Mentoring', 'Outcomes'],
                 datasets: [{
-                    label: 'Faculty Matrix',
+                    label: 'Efficiency',
                     data: [
                         <%= profilePerformance?.coverage || 0 %>,
                         <%= profilePerformance?.engagement || 0 %>,
@@ -122,12 +258,25 @@ document.addEventListener('DOMContentLoaded', () => {
                         <%= profilePerformance?.mentoring || 0 %>,
                         <%= profilePerformance?.outcomes || 0 %>
                     ],
-                    backgroundColor: 'rgba(46, 94, 153, 0.2)',
-                    borderColor: '#2E5E99',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    borderColor: '#3b82f6',
+                    pointBackgroundColor: '#3b82f6',
                     borderWidth: 2
                 }]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { color: gridColor },
+                        grid: { color: gridColor },
+                        pointLabels: { color: labelColor, font: { size: 10, weight: 'bold' } },
+                        ticks: { display: false, stepSize: 20 }
+                    }
+                },
+                plugins: { legend: { display: false } }
+            }
         });
     }
 

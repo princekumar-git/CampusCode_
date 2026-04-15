@@ -199,7 +199,9 @@ module.exports = (db) => {
             [title, content, topic || 'general', user_id, collegeName],
             function (err) {
                 if (err) return res.status(500).json({ success: false, message: 'Database error' });
-                res.json({ success: true, message: 'Thread created successfully', thread_id: this.lastID });
+                req.session.save(() => {
+                    res.json({ success: true, message: 'Thread created successfully', thread_id: this.lastID });
+                });
             }
         );
     });

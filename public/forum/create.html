@@ -77,28 +77,8 @@
             </div>
         </div>
 
-        <nav class="flex-1 px-4 space-y-1 overflow-y-auto mt-2">
-            <p class="px-4 text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 mt-2">Menu</p>
-            <a href="/superadmin/dashboard" class="nav-item">
-                <i class="fa-solid fa-building-columns"></i>
-                <span>Manage Colleges</span>
-            </a>
-            <a href="/superadmin/problems" class="nav-item">
-                <i class="fa-solid fa-code"></i>
-                <span>Manage Problems</span>
-            </a>
-            <a href="/superadmin/contest" class="nav-item">
-                <i class="fa-solid fa-trophy"></i>
-                <span>Manage Contests</span>
-            </a>
-            <a href="/superadmin/support" class="nav-item">
-                <i class="fa-solid fa-life-ring"></i>
-                <span>Support Tickets</span>
-            </a>
-            <a href="/forum/forum.html" class="nav-item active">
-                <i class="fa-solid fa-comments"></i>
-                <span>Community Forum</span>
-            </a>
+        <nav id="roleSidebarNav" class="flex-1 px-4 space-y-1 overflow-y-auto mt-2">
+            <!-- Populated by forum.js dynamically based on user role -->
         </nav>
 
         <div class="p-4 space-y-1 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0 bottom-menu">
@@ -112,7 +92,7 @@
                 </div>
                 <div class="min-w-0">
                     <div id="sidebarName" class="text-sm font-bold text-gray-800 dark:text-white truncate leading-tight">Superadmin</div>
-                    <div class="text-[10px] text-primary-500 dark:text-primary-200 font-semibold uppercase tracking-wider">SuperAdmin</div>
+                    <div id="sidebarRole" class="text-[10px] text-primary-500 dark:text-primary-200 font-semibold uppercase tracking-wider">SuperAdmin</div>
                 </div>
             </div>
         </div>
@@ -239,78 +219,6 @@
     </div>
   </div>
 
-  <script>
-    // Theme initialization
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-
-    function toggleTheme() {
-        const html = document.documentElement;
-        if (html.classList.contains('dark')) {
-            html.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        } else {
-            html.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        }
-    }
-
-    async function loadCurrentUser() {
-        try {
-            const response = await fetch('/api/forum/me');
-            const data = await response.json();
-            if (!data.success || !data.user) return;
-            const fullName = data.user.fullName || 'Superadmin';
-            const initials = fullName.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'SA';
-            document.getElementById('sidebarName').textContent = fullName;
-            document.getElementById('sidebarAvatar').textContent = initials;
-        } catch (error) {
-            console.error('Failed to load profile details', error);
-        }
-    }
-
-    // Handle Form Submission
-    document.getElementById('createThreadForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      
-      const submitBtn = document.getElementById('submitBtn');
-      const originalBtnText = submitBtn.innerHTML;
-      
-      submitBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Posting...';
-      submitBtn.disabled = true;
-
-      const title = document.getElementById('title').value;
-      const content = document.getElementById('content').value;
-      const topic = document.querySelector('input[name="topic"]:checked').value;
-
-      try {
-        const response = await fetch('/api/forum/threads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content, topic })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.success) {
-          window.location.href = '/forum/forum.html';
-        } else {
-          alert(data.error || 'Failed to create thread.');
-          submitBtn.innerHTML = originalBtnText;
-          submitBtn.disabled = false;
-        }
-      } catch (error) {
-        console.error('Submission error:', error);
-        alert('A network error occurred while posting your thread.');
-        submitBtn.innerHTML = originalBtnText;
-        submitBtn.disabled = false;
-      }
-    });
-
-    document.addEventListener('DOMContentLoaded', loadCurrentUser);
-  </script>
+  <script src="/js/forum.js"></script>
 </body>
 </html>

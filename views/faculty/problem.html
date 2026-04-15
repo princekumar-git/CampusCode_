@@ -301,7 +301,7 @@
                                                     </td>
                                                      <td class="px-6 py-4 text-right">
                                                         <div class="flex justify-end items-center gap-1">
-                                                            <a href="/faculty/problem/view/<%= p.id %>"
+                                                            <a href="/faculty/view-problem/<%= p.id %>"
                                                                 class="p-1.5 inline-block rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 transition-colors" title="View">
                                                                 <i class="far fa-eye"></i>
                                                             </a>
@@ -362,13 +362,14 @@
                                                      </td>
                                                      <td class="px-6 py-4 text-right">
                                                          <div class="flex justify-end items-center gap-2">
-                                                             <a href="/faculty/problem/view/<%= p.id %>"
+                                                             <a href="/faculty/view-problem/<%= p.id %>"
                                                                  class="p-1.5 inline-block rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 transition-colors"
                                                                  title="View"><i class="far fa-eye"></i></a>
                                                              <% if (user.isVerified) { %>
+                                                             <div class="hidden problem-description-store" data-base64="<%= Buffer.from(p.description || '').toString('base64') %>"></div>
                                                              <button 
-                                                                 onclick="openEditProblemView(<%= JSON.stringify(p) %>)"
-                                                                 class="p-1.5 inline-block rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500 hover:text-blue-700 transition-colors"
+                                                                 data-problem='<%- JSON.stringify({id: p.id, title: p.title, subject: p.subject, difficulty: p.difficulty, tags: p.tags, input_format: p.input_format, output_format: p.output_format, constraints: p.constraints, sample_input: p.sample_input, sample_output: p.sample_output, hidden_test_cases: p.hidden_test_cases}).replace(/'/g, "&#39;") %>'
+                                                                 class="edit-problem-btn p-1.5 inline-block rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-500 hover:text-blue-700 transition-colors"
                                                                  title="Edit"><i class="fas fa-edit"></i></button>
                                                              <button
                                                                  class="delete-db-problem-btn p-1.5 inline-block rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-red-500 hover:text-red-700 transition-colors"
@@ -414,7 +415,7 @@
                                                             </td>
                                                             <td class="px-6 py-4 text-right">
                                                                 <div class="flex justify-end items-center">
-                                                                    <a href="/faculty/problem/view/<%= problem.id %>" class="bg-primary-50 text-primary-600 hover:bg-primary-100 px-3 py-1 rounded-md text-xs font-medium transition-colors">Solve</a>
+                                                                    <a href="/faculty/view-problem/<%= problem.id %>" class="bg-primary-50 text-primary-600 hover:bg-primary-100 px-3 py-1 rounded-md text-xs font-medium transition-colors">Solve</a>
                                                                     <button class="text-red-500 hover:text-red-700 transition-colors flex items-center gap-1 text-xs font-medium bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded ml-2" title="Remove Bookmark">
                                                                         <i class="fas fa-times"></i> Remove
                                                                     </button>
@@ -458,7 +459,7 @@
                                 <div>
                                     <label
                                         class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
-                                     <select id="problem-subject" name="subject"
+                                     <select id="problem-subject" name="subject" required
                                          class="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm p-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 transition-shadow">
                                         <option value="" disabled selected>Select Subject</option>
                                         <% if (typeof assignedSubjects !== 'undefined' && assignedSubjects.length > 0) { %>
@@ -473,7 +474,7 @@
                                 <div>
                                     <label
                                         class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty</label>
-                                     <select id="problem-difficulty" name="difficulty"
+                                     <select id="problem-difficulty" name="difficulty" required
                                          class="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm p-2.5 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 transition-shadow">
                                         <option>Easy</option>
                                         <option>Medium</option>
@@ -482,7 +483,7 @@
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags</label>
-                                    <input type="text" id="problem-tags" name="tags"
+                                    <input type="text" id="problem-tags" name="tags" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm p-2.5 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 transition-shadow"
                                         placeholder="e.g. arrays, dp, graphs">
                                 </div>
@@ -509,13 +510,13 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Input Format</label>
-                                    <textarea name="input_format" rows="3"
+                                    <textarea name="input_format" rows="3" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm p-2.5 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 transition-shadow"
                                         placeholder="Describe the input format"></textarea>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Output Format</label>
-                                    <textarea name="output_format" rows="3"
+                                    <textarea name="output_format" rows="3" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm p-2.5 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 transition-shadow"
                                         placeholder="Describe the output format"></textarea>
                                 </div>
@@ -531,13 +532,13 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sample Input</label>
-                                    <textarea name="sample_input" rows="3"
+                                    <textarea name="sample_input" rows="3" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm p-2.5 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 transition-shadow"
                                         placeholder="Example input"></textarea>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sample Output</label>
-                                    <textarea name="sample_output" rows="3"
+                                    <textarea name="sample_output" rows="3" required
                                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm p-2.5 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-primary-500 transition-shadow"
                                         placeholder="Example output"></textarea>
                                 </div>
@@ -599,6 +600,12 @@
                     ]
                 }
             });
+
+            // INSTANT SYNC: Update hidden field as they type
+            quillEditor.on('text-change', function() {
+                var hiddenDesc = document.getElementById('hidden-description');
+                if (hiddenDesc) hiddenDesc.value = quillEditor.root.innerHTML;
+            });
         }
 
         // Save Problem Functionality
@@ -618,7 +625,7 @@
         if (problemListView) problemListView.classList.remove('hidden');
 
         // Function to open the form for editing
-        window.openEditProblemView = function(problem) {
+        window.openEditProblemView = function (problem, btn) {
             if (!problemFormView || !problemListView) return;
 
             // Switch views
@@ -644,8 +651,29 @@
             document.querySelector('[name="sample_output"]').value = problem.sample_output || '';
 
             // Pre-populate Quill editor
+            let description = problem.description || '';
+            if (btn) {
+                const row = btn.closest('tr');
+                const descStore = row ? row.querySelector('.problem-description-store') : null;
+                if (descStore && descStore.dataset.base64) {
+                    try {
+                        description = atob(descStore.dataset.base64);
+                    } catch (e) {
+                        console.error('Base64 decode failed, falling back to JSON parse');
+                        try {
+                            description = JSON.parse(descStore.textContent);
+                        } catch (e2) {
+                            description = descStore.innerHTML;
+                        }
+                    }
+                }
+            }
+            
             if (quillEditor) {
-                quillEditor.root.innerHTML = problem.description || '';
+                quillEditor.root.innerHTML = description;
+                // Sync to hidden field immediately
+                const hiddenDesc = document.getElementById('hidden-description');
+                if (hiddenDesc) hiddenDesc.value = description;
             }
 
             // Handle hidden test cases display
@@ -678,7 +706,8 @@
         };
 
         // Reset form for "Create Problem" logic
-        window.openCreateProblemView = function() {
+        // Reset form for "Create Problem" logic
+        function openCreateProblemView() {
             if (!problemFormView || !problemListView) return;
             
             problemListView.classList.add('hidden');
@@ -700,18 +729,41 @@
 
         if (problemForm) {
             problemForm.addEventListener('submit', (e) => {
+                // Aggressive capture: Get latest HTML directly from DOM or Quill instance
+                let description = "";
+                const editorElem = document.querySelector('#editor-container .ql-editor');
+                if (editorElem) {
+                    description = editorElem.innerHTML;
+                } else if (quillEditor) {
+                    description = quillEditor.root.innerHTML;
+                }
+                
+                // Fallback sync to hidden input
+                const hiddenDesc = document.getElementById('hidden-description');
+                if (hiddenDesc) {
+                    hiddenDesc.value = description;
+                }
+                
                 const title = problemTitle.value.trim();
-                const description = quillEditor ? quillEditor.root.innerHTML : '';
                 
                 if (!title) {
                     e.preventDefault();
                     alert('Please enter a problem title');
                     return;
                 }
-
-                document.getElementById('hidden-description').value = description;
             });
         }
+
+        // Event delegation for Edit buttons to avoid JSON string errors
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.edit-problem-btn');
+            if (btn) {
+                try {
+                    const problemData = JSON.parse(btn.getAttribute('data-problem'));
+                    openEditProblemView(problemData, btn);
+                } catch (err) { console.error('Error parsing problem data:', err); }
+            }
+        });
 
         // Delete database problem functionality
         document.addEventListener('click', async (e) => {
@@ -765,6 +817,43 @@
                 openCreateProblemView();
             });
         }
+
+        // Success Toast Handler
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('success') === '1') {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-6 right-6 bg-green-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 z-[200] animate-[slideIn_0.3s_ease-out] border border-white/20 backdrop-blur-sm';
+                toast.innerHTML = `
+                    <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                        <i class="fas fa-check text-lg"></i>
+                    </div>
+                    <div>
+                        <p class="font-bold text-sm">Success!</p>
+                        <p class="text-xs opacity-90">Problem has been saved to your library.</p>
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                
+                // Add keyframes for slideIn if they don't exist
+                if (!document.getElementById('toast-styles')) {
+                    const style = document.createElement('style');
+                    style.id = 'toast-styles';
+                    style.innerHTML = '@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }';
+                    document.head.appendChild(style);
+                }
+
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateY(20px)';
+                    toast.style.transition = 'all 0.5s ease-in-out';
+                    setTimeout(() => toast.remove(), 500);
+                }, 4000);
+
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        });
     </script>
 </body>
 

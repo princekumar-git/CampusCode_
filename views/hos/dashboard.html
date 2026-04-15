@@ -196,17 +196,13 @@
                                     <% if (recentActivity.length === 0) { %>
                                         <p class="text-sm text-gray-500 italic py-4">No recent activity for your subjects.</p>
                                     <% } else { %>
-                                        <% recentActivity.forEach(act => { %>
-                                            <% const colors = { problem: 'bg-blue-500', contest: 'bg-purple-500' }; %>
-                                            <% const icons = { problem: 'fa-file-code', contest: 'fa-trophy' }; %>
-                                            <% const labels = { pending: 'Submitted', approved: 'Approved', rejected: 'Rejected' }; %>
+                                        <% recentActivity.forEach(activity => { %>
                                             <div class="relative">
-                                                <div class="absolute -left-[21px] top-1 h-3 w-3 rounded-full <%= colors[act.type] || 'bg-gray-400' %> ring-4 ring-white dark:ring-gray-800"></div>
+                                                <div class="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-<%= activity.color %>-500 ring-4 ring-white dark:ring-gray-800"></div>
                                                 <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                                    <i class="fas <%= icons[act.type] || 'fa-circle' %> text-xs mr-1 text-gray-400"></i>
-                                                    <%= labels[act.status] || act.status %> "<%= act.title %>"
+                                                    <%= activity.text %>
                                                 </p>
-                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">By <%= act.author %> &bull; <% if (act.createdAt) { %><%= new Date(act.createdAt).toLocaleDateString() %><% } else { %>Unknown<% } %></p>
+                                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5"><%= activity.time %></p>
                                             </div>
                                         <% }) %>
                                     <% } %>
