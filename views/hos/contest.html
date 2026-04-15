@@ -133,8 +133,8 @@
                                         class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 transition-colors">
                                         <i class="fas fa-arrow-left text-lg"></i>
                                     </button>
-                                    <h2 id="form-title" class="text-2xl font-bold text-gray-800 dark:text-white">Create
-                                        New Contest</h2>
+                                    <h2 id="form-title" class="text-2xl font-bold text-gray-800 dark:text-white">Create New
+                                        Contest</h2>
                                 </div>
 
                                 <form id="create-contest-form" class="space-y-8">
@@ -146,37 +146,33 @@
                                         </h3>
                                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                             <div class="md:col-span-3">
-                                                <label
-                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contest
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contest
                                                     Title</label>
-                                                <input type="text" id="form-contest-title"
-                                                    placeholder="e.g. End Semester Coding Assessment"
+                                                <input type="text" id="form-contest-title" placeholder="e.g. End Semester Coding Assessment"
                                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all">
                                             </div>
                                             <div>
-                                                <label
-                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start
-                                                    Date &amp; Time</label>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Start Date
+                                                    & Time</label>
                                                 <input type="datetime-local" id="form-contest-date"
+                                                    onclick="this.min=new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16);"
                                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none">
                                             </div>
                                             <div>
-                                                <label
-                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End
-                                                    Date &amp; Time</label>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">End Date
+                                                    & Time</label>
                                                 <input type="datetime-local" id="form-contest-end"
                                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none">
                                             </div>
+
                                             <div>
-                                                <label
-                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Duration</label>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Duration</label>
                                                 <input type="text" id="form-contest-duration" readonly
                                                     placeholder="Auto-calculated from start/end"
                                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-600 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none">
                                             </div>
                                             <div>
-                                                <label
-                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Registration
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Registration
                                                     Deadline</label>
                                                 <input type="datetime-local" id="form-contest-deadline"
                                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none">
@@ -192,68 +188,44 @@
                                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                                                 <!-- Subject Selection -->
                                                 <div>
-                                                    <label
-                                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject
+                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subject
                                                         Eligibility</label>
-                                                    <select id="eligibility-subject"
+                                                    <select id="eligibility-subject" name="subject"
                                                         class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary-500 transition-all">
-                                                        <option value="" disabled selected>Select Subject</option>
-                                                        <% if (typeof dropdownData !=='undefined' &&
-                                                            dropdownData.subjects) { %>
-                                                            <% dropdownData.subjects.forEach(function(s){ %>
-                                                                <option value="<%= s %>">
-                                                                    <%= s %>
-                                                                </option>
-                                                                <% }) %>
-                                                                    <% } %>
+                                                        <option value="">All Subjects</option>
+                                                        <% (typeof dropdownData !== 'undefined' && dropdownData.subjects || []).forEach(function(s){ %>
+                                                            <option value="<%= s %>"><%= s %></option>
+                                                        <% }) %>
                                                     </select>
                                                 </div>
 
-                                                <!-- Year Multi-select -->
+                                                <!-- Year Multi-select placeholder -->
                                                 <div>
-                                                    <label
-                                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target
+                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target
                                                         Year(s)</label>
                                                     <div id="eligibility-years-container"
                                                         class="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-700 grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
-                                                        <% if (typeof dropdownData !=='undefined' && dropdownData.years)
-                                                            { %>
-                                                            <% dropdownData.years.forEach(function(y){ %>
-                                                                <label
-                                                                    class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-                                                                    <input type="checkbox" name="year[]"
-                                                                        value="<%= y %>"
-                                                                        class="year-checkbox rounded border-gray-300 text-primary-600 focus:ring-primary-500">
-                                                                    <span>
-                                                                        <%= y %>
-                                                                    </span>
-                                                                </label>
-                                                                <% }) %>
-                                                                    <% } %>
+                                                        <% (typeof dropdownData !== 'undefined' && dropdownData.years || []).forEach(function(y){ %>
+                                                            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                                                                <input type="checkbox" name="year[]" value="<%= y %>" class="year-checkbox rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                                                                <span><%= y %></span>
+                                                            </label>
+                                                        <% }) %>
                                                     </div>
                                                 </div>
 
-                                                <!-- Section Multi-select -->
+                                                <!-- Section Multi-select placeholder -->
                                                 <div>
-                                                    <label
-                                                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target
+                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Target
                                                         Section(s)</label>
                                                     <div id="eligibility-sections-container"
                                                         class="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-700 grid grid-cols-2 gap-2 max-h-32 overflow-y-auto custom-scrollbar">
-                                                        <% if (typeof dropdownData !=='undefined' &&
-                                                            dropdownData.sections) { %>
-                                                            <% dropdownData.sections.forEach(function(sec){ %>
-                                                                <label
-                                                                    class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
-                                                                    <input type="checkbox" name="section[]"
-                                                                        value="<%= sec %>"
-                                                                        class="section-checkbox rounded border-gray-300 text-primary-600 focus:ring-primary-500">
-                                                                    <span>
-                                                                        <%= sec %>
-                                                                    </span>
-                                                                </label>
-                                                                <% }) %>
-                                                                    <% } %>
+                                                        <% (typeof dropdownData !== 'undefined' && dropdownData.sections || []).forEach(function(sec){ %>
+                                                            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-primary-600 dark:hover:text-primary-400 transition-colors">
+                                                                <input type="checkbox" name="section[]" value="<%= sec %>" class="section-checkbox rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                                                                <span><%= sec %></span>
+                                                            </label>
+                                                        <% }) %>
                                                     </div>
                                                 </div>
                                             </div>
@@ -263,52 +235,67 @@
                                         <div class="mt-8">
                                             <div
                                                 class="flex justify-between items-center mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
-                                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">3.
-                                                    Contest Problems</h3>
+                                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">3. Contest Problems</h3>
                                                 <button type="button" id="btn-manage-problems"
-                                                    class="flex items-center gap-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-blue-400 rounded-lg text-xs font-bold hover:bg-primary-100 transition-all active:scale-95">
+                                                    class="flex items-center gap-2 px-4 py-2 bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-lg text-xs font-bold hover:bg-primary-100 transition-all active:scale-95">
                                                     <i class="fas fa-plus-circle"></i> Manage Problems
                                                     <span id="selected-problems-count-badge"
-                                                        class="ml-1 bg-primary-600 dark:bg-blue-600 text-white px-2 py-0.5 rounded-full">0</span>
+                                                        class="ml-1 bg-primary-600 text-white px-2 py-0.5 rounded-full">0</span>
                                                 </button>
                                             </div>
 
                                             <div id="selected-problems-preview"
                                                 class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[100px] p-4 bg-gray-50 dark:bg-gray-900/30 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-                                                <p class="col-span-full text-center text-gray-400 text-sm py-8 italic">
-                                                    No problems selected yet. Click 'Manage Problems' to add some.</p>
+                                                <!-- Populated via JS -->
+                                                <p class="col-span-full text-center text-gray-400 text-sm py-8 italic">No problems selected
+                                                    yet. Click 'Manage Problems' to add some.</p>
                                             </div>
                                         </div>
 
-                                        <!-- 4. Additional Details -->
+                                        <!-- 4. Scope & Finalize -->
                                         <div class="mt-8">
                                             <h3
                                                 class="text-lg font-semibold text-gray-800 dark:text-white mb-4 border-b border-gray-100 dark:border-gray-700 pb-2">
                                                 4. Additional Details
                                             </h3>
                                             <div>
-                                                <label
-                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Short
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Short
                                                     Description</label>
-                                                <input type="text" id="form-contest-desc"
-                                                    placeholder="Briefly describe the contest goal"
+                                                <input type="text" id="form-contest-desc" placeholder="Briefly describe the contest goal"
                                                     class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500">
                                             </div>
 
                                             <div class="mt-6">
-                                                <label
-                                                    class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contest
-                                                    Rules &amp; Instructions</label>
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contest Rules
+                                                    & Instructions</label>
                                                 <div id="editor-container"
                                                     class="h-48 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl overflow-hidden">
                                                     <!-- Quill Editor -->
                                                 </div>
                                             </div>
+                                            <div class="mt-4">
+                                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Guidelines</label>
+                                                <textarea id="form-contest-guidelines" rows="3" placeholder="Any additional guidelines for participants"
+                                                    class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-4 py-2.5 text-sm text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                                                <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/20">
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Created By</p>
+                                                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= user.fullName %></p>
+                                                </div>
+                                                <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/20">
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Created On</p>
+                                                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-200"><%= new Date().toLocaleString() %></p>
+                                                </div>
+                                                <div class="rounded-lg border border-gray-200 dark:border-gray-700 p-3 bg-gray-50 dark:bg-gray-900/20">
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Approved By</p>
+                                                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">Will be set after submission</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div
-                                        class="flex justify-end gap-4 pt-8 mt-8 border-t border-gray-100 dark:border-gray-700">
+                                    <div class="flex justify-end gap-4 pt-8 mt-8 border-t border-gray-100 dark:border-gray-700">
                                         <button type="button" id="btn-cancel-contest"
                                             class="px-8 py-3 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-gray-700 transition-all">
                                             Discard
@@ -658,6 +645,24 @@
             const contestEndInput = document.getElementById('form-contest-end');
             const contestDurationInput = document.getElementById('form-contest-duration');
 
+            // Initialize Quill Editor
+            let quillEditor;
+            if (document.getElementById('editor-container')) {
+                quillEditor = new Quill('#editor-container', {
+                    theme: 'snow',
+                    placeholder: 'Write contest rules and instructions...',
+                    modules: {
+                        toolbar: [
+                            [{ 'header': [1, 2, 3, false] }],
+                            ['bold', 'italic', 'underline', 'strike'],
+                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                            [{ 'color': [] }, { 'background': [] }],
+                            ['clean']
+                        ]
+                    }
+                });
+            }
+
             if (contestFormView) contestFormView.classList.add('hidden');
             if (sectionManageContests) sectionManageContests.classList.remove('hidden');
 
@@ -855,6 +860,8 @@
                     document.getElementById('edit-contest-id').value = '';
                     document.getElementById('form-title').textContent = "Create New Contest";
                     if (contestDurationInput) contestDurationInput.value = '';
+                    if (quillEditor) quillEditor.root.innerHTML = '';
+                    document.getElementById('form-contest-guidelines').value = '';
                     selectedProblems = [];
                     updateSelectedProblemsPreview();
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1053,6 +1060,8 @@
                     const duration = document.getElementById('form-contest-duration').value;
                     const deadlineValue = document.getElementById('form-contest-deadline').value;
                     const description = document.getElementById('form-contest-desc').value;
+                    const guidelines = document.getElementById('form-contest-guidelines').value;
+                    const rulesHtml = (typeof quillEditor !== 'undefined' && quillEditor?.root) ? quillEditor.root.innerHTML : '';
 
                     if (!title || !contestDateValue || !endDateValue || !deadlineValue) {
                         alert("Please fill in all required fields (Title, Start Date, End Date, and Deadline)."); return;
@@ -1071,7 +1080,8 @@
                         registrationEndDate: deadlineValue, duration, deadline: deadlineValue,
                         description, eligibility,
                         problems: JSON.stringify(selectedProblems.map(p => p.id)),
-                        rulesAndDescription: ""
+                        rulesAndDescription: rulesHtml,
+                        guidelines
                     };
                     if (editId) payload.id = editId;
 
@@ -1316,6 +1326,10 @@
                 document.getElementById('form-contest-duration').value = contest.duration || '';
                 document.getElementById('form-contest-deadline').value = formatDateTimeForInput(contest.deadline);
                 document.getElementById('form-contest-desc').value = contest.description;
+                document.getElementById('form-contest-guidelines').value = contest.guidelines || '';
+                if (quillEditor) {
+                    quillEditor.root.innerHTML = contest.rulesAndDescription || '';
+                }
                 refreshComputedDuration();
                 try {
                     const parts = contest.eligibility.split('|');
