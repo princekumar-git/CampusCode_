@@ -402,8 +402,21 @@ module.exports = (db, transporter) => {
             const totalUsers = users.length;
             
             // Safe queries for other tables
-            const contests = await safeQuery(`SELECT id FROM contests WHERE collegeName = ?`, [collegeName]);
-            const feedRows = await safeQuery(`SELECT action, createdAt FROM activity_feed WHERE collegeName = ? ORDER BY createdAt DESC LIMIT 10`, [collegeName]);
+            const contests = await safeQuery(`
+                SELECT c.id
+                FROM contests c
+                LEFT JOIN account_users cu ON cu.id = c.createdBy
+                WHERE LOWER(
+                    TRIM(
+                        COALESCE(
+                            NULLIF(c.collegeName, ''),
+                            NULLIF(cu.collegeName, ''),
+                            ''
+                        )
+                    )
+                ) = LOWER(TRIM(COALESCE(?, '')))
+            `, [collegeName]);
+            const feedRows = [];
             
             // 👉 ADDED: Fetch programs count for the dashboard and profile overlay
             const programs = await safeQuery(`SELECT id FROM programs WHERE collegeName = ? OR collegeName IS NULL`, [collegeName]);
@@ -1312,7 +1325,21 @@ router.post('/update-profile', requireRole('admin'), (req, res) => {
     // ==========================================
     router.get('/api/contests', requireRole('admin'), (req, res) => {
         const collegeName = req.session.user.collegeName;
-        db.all(`SELECT * FROM contests WHERE collegeName = ? ORDER BY id DESC`, [collegeName], (err, rows) => {
+        db.all(`
+            SELECT c.*
+            FROM contests c
+            LEFT JOIN account_users cu ON cu.id = c.createdBy
+            WHERE LOWER(
+                TRIM(
+                    COALESCE(
+                        NULLIF(c.collegeName, ''),
+                        NULLIF(cu.collegeName, ''),
+                        ''
+                    )
+                )
+            ) = LOWER(TRIM(COALESCE(?, '')))
+            ORDER BY c.id DESC
+        `, [collegeName], (err, rows) => {
                 if (err) return res.status(500).json({ success: false, message: err.message });
                 
                 const contests = rows.map(row => {
@@ -1329,16 +1356,79 @@ router.post('/update-profile', requireRole('admin'), (req, res) => {
         });
 
     router.get('/api/contests/level/:level', requireRole('admin'), (req, res) => {
-        const level = req.params.level; 
+        const level = String(req.params.level || '').trim().toLowerCase();
         const collegeName = req.session.user.collegeName;
-        
-        let query = `SELECT * FROM contests WHERE scope = ?`;
-        let params = [level];
+
+        let query = `
+            SELECT c.*, LOWER(COALESCE(cu.role, '')) AS creator_role
+            FROM contests c
+            LEFT JOIN account_users cu ON cu.id = c.createdBy
+            WHERE 1 = 1
+        `;
+        const params = [];
+
+        // Superadmin-created contests are always treated as global in college admin view.
+        if (level === 'global') {
+            query += `
+                AND (
+                    LOWER(COALESCE(cu.role, '')) = 'superadmin'
+                    OR LOWER(COALESCE(NULLIF(c.scope, ''), NULLIF(c.level, ''), 'college')) = 'global'
+                )
+            `;
+        } else if (level === 'college') {
+            query += `
+                AND LOWER(COALESCE(NULLIF(c.scope, ''), NULLIF(c.level, ''), 'college')) = 'college'
+                AND LOWER(COALESCE(cu.role, '')) != 'superadmin'
+            `;
+        } else if (level === 'multi-college') {
+            query += `
+                AND LOWER(COALESCE(NULLIF(c.scope, ''), NULLIF(c.level, ''), 'college')) = 'multi-college'
+                AND LOWER(COALESCE(cu.role, '')) != 'superadmin'
+            `;
+        } else {
+            query += ` AND LOWER(COALESCE(NULLIF(c.scope, ''), NULLIF(c.level, ''), 'college')) = ?`;
+            params.push(level);
+        }
 
         if (level === 'college') {
-            query += ` AND collegeName = ?`;
+            query += `
+                AND LOWER(
+                    TRIM(
+                        COALESCE(
+                            NULLIF(c.collegeName, ''),
+                            NULLIF(cu.collegeName, ''),
+                            ''
+                        )
+                    )
+                ) = LOWER(TRIM(COALESCE(?, '')))
+            `;
             params.push(collegeName);
+        } else if (level === 'multi-college') {
+            query += `
+                AND (
+                    EXISTS (
+                        SELECT 1
+                        FROM json_each(CASE
+                            WHEN TRIM(COALESCE(c.colleges, '')) = '' THEN '[]'
+                            ELSE c.colleges
+                        END)
+                        WHERE LOWER(TRIM(json_each.value)) = LOWER(TRIM(COALESCE(?, '')))
+                    )
+                    OR LOWER(
+                        TRIM(
+                            COALESCE(
+                                NULLIF(c.collegeName, ''),
+                                NULLIF(cu.collegeName, ''),
+                                ''
+                            )
+                        )
+                    ) = LOWER(TRIM(COALESCE(?, '')))
+                )
+            `;
+            params.push(collegeName, collegeName);
         }
+
+        query += ` ORDER BY c.id DESC`;
 
         db.all(query, params, (err, rows) => {
             if (err) return res.status(500).json({ success: false, message: err.message });
