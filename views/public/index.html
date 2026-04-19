@@ -451,7 +451,7 @@ body { transition: background-color 0.5s ease; overflow-x: hidden; }
     <!-- SVG Background Connections -->
     <div class="absolute inset-0 z-0 pointer-events-none opacity-20 dark:opacity-10">
         <svg class="w-full h-full" viewBox="0 0 1440 800" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M0 400C300 100 600 700 900 400C1200 100 1440 400" stroke="#00C2FF" stroke-width="2" stroke-dasharray="10 10"/>
+            <path d="M0 400C300 100 600 700 900 400C1200 100 1320 400 1440 300" stroke="#00C2FF" stroke-width="2" stroke-dasharray="10 10"/>
             <path d="M0 600C400 300 800 900 1440 600" stroke="#1A4A8A" stroke-width="2" stroke-dasharray="10 10"/>
         </svg>
     </div>
@@ -1055,7 +1055,7 @@ async function initLandingDynamicData() {
                     <div class="flex items-center gap-5">
                         <span class="font-black text-2xl ${badgeClass} italic">#0${rank}</span>
                         <div class="w-12 h-12 rounded-full bg-gradient-to-br from-navy to-midnight flex items-center justify-center font-bold text-white shadow-[0_4px_15px_rgba(0,0,0,0.1)]">
-                            ${getInitials(row.fullName)}
+                            ${initials(row.fullName)}
                         </div>
                         <div>
                             <p class="font-black">${row.fullName || 'Anonymous'}</p>

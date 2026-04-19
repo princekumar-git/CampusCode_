@@ -5,26 +5,78 @@ module.exports = (db, transporter) => {
     const router = express.Router();
 
     const SESSION_COLS = `id, role, fullName, email, password, collegeName, department, branch, program, year, section, status, is_verified, isVerified, post, gender, mobile, joiningDate, course, subject, points, solvedCount, rank, is_hod, createdAt`;
-    
-    const USER_LOOKUP_SQL = `
-        SELECT ${SESSION_COLS}, 'student' as source_table FROM student WHERE email = ?
-        UNION ALL
-        SELECT ${SESSION_COLS}, 'faculty' as source_table FROM faculty WHERE email = ?
-        UNION ALL
-        SELECT ${SESSION_COLS}, 'users' as source_table FROM users WHERE email = ?
-        LIMIT 1
-    `;
+    const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+    const findUserByEmail = (email, done) => {
+        const normalized = normalizeEmail(email);
+        if (!normalized) return done(null, null);
+
+        // Avoid cross-identity session mixups:
+        // 1) Individual/student identities from student table (primary for learner accounts)
+        // 2) Faculty/HOD/HOS from faculty table
+        // 3) Users table fallback (superadmin/admin/legacy)
+        db.get(
+            `SELECT ${SESSION_COLS}, 'student' as source_table
+             FROM student
+             WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+             ORDER BY CASE
+                 WHEN LOWER(COALESCE(role, '')) = 'individual' THEN 0
+                 WHEN LOWER(COALESCE(role, '')) = 'student' THEN 1
+                 ELSE 2
+             END, id DESC
+             LIMIT 1`,
+            [normalized],
+            (errStudent, studentRow) => {
+                if (errStudent) return done(errStudent);
+                if (studentRow && ['individual', 'student'].includes(String(studentRow.role || '').toLowerCase())) {
+                    return done(null, studentRow);
+                }
+
+                db.get(
+                    `SELECT ${SESSION_COLS}, 'faculty' as source_table
+                     FROM faculty
+                     WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                     ORDER BY id DESC
+                     LIMIT 1`,
+                    [normalized],
+                    (errFaculty, facultyRow) => {
+                        if (errFaculty) return done(errFaculty);
+                        if (facultyRow) return done(null, facultyRow);
+
+                        db.get(
+                            `SELECT ${SESSION_COLS}, 'users' as source_table
+                             FROM users
+                             WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                             ORDER BY CASE
+                                 WHEN LOWER(COALESCE(role, '')) IN ('superadmin', 'admin') THEN 0
+                                 WHEN LOWER(COALESCE(role, '')) IN ('hod', 'hos', 'faculty') THEN 1
+                                 WHEN LOWER(COALESCE(role, '')) IN ('individual', 'student') THEN 2
+                                 ELSE 3
+                             END, id DESC
+                             LIMIT 1`,
+                            [normalized],
+                            (errUsers, userRow) => {
+                                if (errUsers) return done(errUsers);
+                                if (userRow) return done(null, userRow);
+                                return done(null, studentRow || null);
+                            }
+                        );
+                    }
+                );
+            }
+        );
+    };
 
     // ==========================================
     // 1. SEND OTP FOR STUDENT/FACULTY SIGNUP
     // ==========================================
     router.post('/send-signup-otp', (req, res) => {
-        const { email } = req.body;
+        const rawEmail = String(req.body?.email || '').trim();
+        const email = rawEmail.toLowerCase();
 
         if (!email) return res.status(400).json({ success: false, message: 'Email is required.' });
 
         // Check if the email is already registered
-        db.get(USER_LOOKUP_SQL, [email, email, email], (err, row) => {
+        findUserByEmail(email, (err, row) => {
             if (err) return res.status(500).json({ success: false, message: 'Database error.' });
             if (row) return res.status(400).json({ success: false, message: 'Email is already registered.' });
 
@@ -32,18 +84,20 @@ module.exports = (db, transporter) => {
             const otp = Math.floor(100000 + Math.random() * 900000).toString();
             const expiry = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
 
-            db.run(`INSERT INTO otps (email, code, expiry) VALUES (?, ?, ?) 
-                    ON CONFLICT(email) DO UPDATE SET code=excluded.code, expiry=excluded.expiry`,
-                [email, otp, expiry],
-                (err) => {
-                    if (err) return res.status(500).json({ success: false, message: 'Database error saving OTP.' });
+            // Works for both SQLite and Postgres even when otps.email has no UNIQUE constraint.
+            db.get(
+                `SELECT email FROM otps WHERE LOWER(email) = LOWER(?) LIMIT 1`,
+                [email],
+                (findErr, existingOtp) => {
+                    if (findErr) return res.status(500).json({ success: false, message: 'Database error saving OTP.' });
 
-                    // Send the email with a beautiful responsive HTML template
-                    const mailOptions = {
-                        from: process.env.EMAIL_USER,
-                        to: email,
-                        subject: 'Verify Your Email - CampusCode',
-                        html: `
+                    const finishMailFlow = () => {
+                        // Send the email with a beautiful responsive HTML template
+                        const mailOptions = {
+                            from: process.env.EMAIL_USER,
+                            to: email,
+                            subject: 'Verify Your Email - CampusCode',
+                            html: `
                         <!DOCTYPE html>
                         <html>
                         <head>
@@ -100,15 +154,37 @@ module.exports = (db, transporter) => {
                         </body>
                         </html>
                         `
+                        };
+
+                        transporter.sendMail(mailOptions, (error, info) => {
+                            if (error) {
+                                console.error("Email Error:", error);
+                                return res.status(500).json({ success: false, message: 'Failed to send OTP.' });
+                            }
+                            res.json({ success: true, message: 'OTP sent successfully.' });
+                        });
                     };
 
-                    transporter.sendMail(mailOptions, (error, info) => {
-                        if (error) {
-                            console.error("Email Error:", error);
-                            return res.status(500).json({ success: false, message: 'Failed to send OTP.' });
+                    if (existingOtp?.email) {
+                        db.run(
+                            `UPDATE otps SET code = ?, expiry = ? WHERE LOWER(email) = LOWER(?)`,
+                            [otp, expiry, existingOtp.email],
+                            (updateErr) => {
+                                if (updateErr) return res.status(500).json({ success: false, message: 'Database error saving OTP.' });
+                                return finishMailFlow();
+                            }
+                        );
+                        return;
+                    }
+
+                    db.run(
+                        `INSERT INTO otps (email, code, expiry) VALUES (?, ?, ?)`,
+                        [email, otp, expiry],
+                        (insertErr) => {
+                            if (insertErr) return res.status(500).json({ success: false, message: 'Database error saving OTP.' });
+                            return finishMailFlow();
                         }
-                        res.json({ success: true, message: 'OTP sent successfully.' });
-                    });
+                    );
                 }
             );
         });
@@ -118,7 +194,8 @@ module.exports = (db, transporter) => {
     // 2. INSTITUTION REGISTRATION (OTP Verification)
     // ==========================================
     router.post('/register-institution', async (req, res) => {
-        const { role, fullName, collegeName, email, otp, password } = req.body;
+        const { role, fullName, collegeName, otp, password } = req.body;
+        const email = normalizeEmail(req.body?.email);
 
         try {
             // ⭐ Hash the password before saving
@@ -160,7 +237,8 @@ module.exports = (db, transporter) => {
     // 3. STUDENT/FACULTY SIGNUP
     // ==========================================
     router.post('/signup', async (req, res) => {
-        const { name, email, password, collegeName, role, otp } = req.body;
+        const { name, password, collegeName, role, otp } = req.body;
+        const email = normalizeEmail(req.body?.email);
         const fullName = name; // Map to database field name
         const userRole = role ? role.trim().toLowerCase() : 'student';
 
@@ -228,9 +306,10 @@ module.exports = (db, transporter) => {
     // 4. LOGIN LOGIC
     // ==========================================
     router.post('/login', (req, res) => {
-        const { email, password } = req.body;
+        const email = normalizeEmail(req.body?.email);
+        const password = String(req.body?.password || '');
 
-        db.get(USER_LOOKUP_SQL, [email, email, email], async (err, user) => {
+        findUserByEmail(email, async (err, user) => {
             if (err || !user) {
                 return res.status(400).send('<h2>Invalid email or password.</h2><a href="/">Go Home</a>');
             }

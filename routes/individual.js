@@ -6,6 +6,23 @@ module.exports = (db) => {
     const router = express.Router();
     const requireIndividual = requireRole('individual');
     let profileColumnsEnsured = false;
+    let notesTableEnsured = false;
+    const parseDateValue = (value) => {
+        if (!value) return null;
+        if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+        const raw = String(value).trim();
+        if (!raw) return null;
+        const dt = new Date(raw.replace(' ', 'T'));
+        return Number.isNaN(dt.getTime()) ? null : dt;
+    };
+    const localDateKey = (value) => {
+        const d = parseDateValue(value);
+        if (!d) return '';
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
     const dbGet = (query, params = []) => new Promise((resolve, reject) => {
         db.get(query, params, (err, row) => err ? reject(err) : resolve(row));
     });
@@ -18,6 +35,50 @@ module.exports = (db) => {
             resolve(this);
         });
     });
+    const resolveIndividualUser = async (sessionUser) => {
+        const email = String(sessionUser?.email || '').trim().toLowerCase();
+        const sessionId = Number(sessionUser?.id);
+        if (email) {
+            const fromStudent = await dbGet(`
+                SELECT id, fullName, email, points, solvedCount, rank, role, status,
+                       mobile, gender, course, program, department, branch, year, section,
+                       notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
+                       github_link, location
+                FROM student
+                WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                  AND LOWER(COALESCE(role, '')) = 'individual'
+                ORDER BY id DESC
+                LIMIT 1
+            `, [email]);
+            if (fromStudent) return { ...fromStudent, sourceTable: 'student' };
+
+            const fromUsers = await dbGet(`
+                SELECT id, fullName, email, points, solvedCount, rank, role, status,
+                       mobile, gender, course, program, department, branch, year, section,
+                       notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
+                       github_link, location
+                FROM users
+                WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                  AND LOWER(COALESCE(role, '')) = 'individual'
+                ORDER BY id DESC
+                LIMIT 1
+            `, [email]);
+            if (fromUsers) return { ...fromUsers, sourceTable: 'users' };
+        }
+        if (Number.isInteger(sessionId) && sessionId > 0) {
+            const fallback = await dbGet(`
+                SELECT id, fullName, email, points, solvedCount, rank, role, status,
+                       mobile, gender, course, program, department, branch, year, section,
+                       notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
+                       github_link, location
+                FROM account_users
+                WHERE id = ?
+                LIMIT 1
+            `, [sessionId]);
+            if (fallback) return { ...fallback, sourceTable: 'account_users' };
+        }
+        return null;
+    };
 
     const ensureProfileColumns = async () => {
         if (profileColumnsEnsured) return;
@@ -32,8 +93,95 @@ module.exports = (db) => {
         profileColumnsEnsured = true;
     };
 
+    const ensureProblemNotesTable = async () => {
+        if (notesTableEnsured) return;
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS individual_problem_notes (
+                user_id INTEGER NOT NULL,
+                problem_id INTEGER NOT NULL,
+                before_plan TEXT DEFAULT '',
+                approach TEXT DEFAULT '',
+                edge_cases TEXT DEFAULT '',
+                complexity TEXT DEFAULT '',
+                mistakes TEXT DEFAULT '',
+                revision TEXT DEFAULT '',
+                tags TEXT DEFAULT '',
+                revise_bucket TEXT DEFAULT '',
+                is_pinned INTEGER DEFAULT 0,
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, problem_id)
+            )
+        `);
+        await dbRun(`
+            CREATE TABLE IF NOT EXISTS individual_problem_note_entries (
+                entry_id TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                problem_id INTEGER NOT NULL,
+                status TEXT DEFAULT '',
+                language TEXT DEFAULT '',
+                passed_count INTEGER DEFAULT 0,
+                total_count INTEGER DEFAULT 0,
+                used_method TEXT DEFAULT '',
+                best_method TEXT DEFAULT '',
+                previous_approach TEXT DEFAULT '',
+                approach_snapshot TEXT DEFAULT '',
+                code_snapshot TEXT DEFAULT '',
+                createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        notesTableEnsured = true;
+    };
+
+    const detectMethodFromCode = (code) => {
+        const src = String(code || '').toLowerCase();
+        if (!src.trim()) return 'Not detected';
+        if (src.includes('heapq') || src.includes('priority_queue')) return 'Heap / Priority Queue';
+        if (src.includes('deque') || src.includes('queue<')) return 'Queue / BFS';
+        if (src.includes('dfs') || src.includes('stack<') || src.includes('recursion') || src.includes('def dfs')) return 'DFS / Recursion';
+        if (src.includes('binary_search') || src.includes('while (l <= r') || src.includes('mid =')) return 'Binary Search';
+        if (src.includes('dp[') || src.includes('memo') || src.includes('tabulation')) return 'Dynamic Programming';
+        if (src.includes('sliding window') || (src.includes('left') && src.includes('right') && src.includes('while'))) return 'Sliding Window / Two Pointers';
+        if (src.includes('sort(') || src.includes('.sort(') || src.includes('sorted(')) return 'Sorting-based';
+        if (src.includes('unordered_map') || src.includes('hashmap') || src.includes('dict(') || src.includes('{}')) return 'Hashing / Map';
+        return 'Brute Force / Custom Logic';
+    };
+
+    const suggestBestMethod = (title, difficulty, tags) => {
+        const t = String(title || '').toLowerCase();
+        const d = String(difficulty || '').toLowerCase();
+        const tagText = String(tags || '').toLowerCase();
+        const all = `${t} ${tagText}`;
+        if (all.includes('palindrome')) return 'Two pointers (or reverse-check) with O(n) time';
+        if (all.includes('subarray') && all.includes('xor')) return 'Prefix XOR + hashmap frequency counting';
+        if (all.includes('window') || all.includes('substring')) return 'Sliding window with frequency map';
+        if (all.includes('merge k') || all.includes('k sorted')) return 'Min-heap across k lists';
+        if (all.includes('graph') || all.includes('tree')) return 'BFS/DFS traversal with visited tracking';
+        if (all.includes('dp') || d === 'hard') return 'Dynamic programming or optimized data-structure approach';
+        if (d === 'medium') return 'Hashmap / two-pointers / sorting based optimization';
+        return 'Single-pass linear approach with edge-case handling';
+    };
+
     const serve = (file) => (req, res) =>
         res.sendFile(path.join(__dirname, '../views/individual', file));
+
+    router.use(async (req, _res, next) => {
+        try {
+            if (!req.session?.user) return next();
+            const role = String(req.session.user.role || '').toLowerCase();
+            if (role !== 'individual') return next();
+            const resolved = await resolveIndividualUser(req.session.user);
+            if (!resolved) return next();
+            req.session.user.id = resolved.id;
+            req.session.user.email = resolved.email || req.session.user.email;
+            req.session.user.fullName = resolved.fullName || req.session.user.fullName;
+            req.session.user.name = resolved.fullName || req.session.user.name;
+            req.session.user.role = 'individual';
+            return next();
+        } catch (_err) {
+            return next();
+        }
+    });
 
     router.get('/', requireIndividual, (req, res) => {
         return res.redirect('/individual/dashboard');
@@ -82,16 +230,12 @@ module.exports = (db) => {
     router.get('/api/contests/:id/leaderboard', requireIndividual, (req, res) => res.redirect(307, `/student/api/contests/${req.params.id}/leaderboard`));
     router.get('/api/dashboard-data', requireIndividual, async (req, res) => {
         try {
-            const userId = Number(req.session?.user?.id);
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
-
-            const user = await dbGet(`
-                SELECT id, fullName, email, points, solvedCount, rank
-                FROM account_users
-                WHERE id = ?
-            `, [userId]);
+            const user = resolvedUser;
             if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
             const points = Number(user.points || 0);
@@ -146,11 +290,11 @@ module.exports = (db) => {
 
             let streakDays = 0;
             if (acceptedRows.length) {
-                const dates = new Set(acceptedRows.map(r => String(r.d)));
+                const dates = new Set(acceptedRows.map(r => localDateKey(r.d)).filter(Boolean));
                 const cursor = new Date();
                 cursor.setHours(0, 0, 0, 0);
                 while (true) {
-                    const key = cursor.toISOString().slice(0, 10);
+                    const key = localDateKey(cursor);
                     if (!dates.has(key)) break;
                     streakDays += 1;
                     cursor.setDate(cursor.getDate() - 1);
@@ -160,49 +304,62 @@ module.exports = (db) => {
             const recentProblems = await dbAll(`
                 SELECT p.title,
                        COALESCE(NULLIF(p.difficulty, ''), 'Easy') AS difficulty,
-                       MAX(s.createdAt) AS solvedAt
+                       MAX(s.createdAt) AS "solvedAt"
                 FROM submissions s
                 JOIN problems p ON p.id = s.problem_id
                 WHERE s.user_id = ?
                   AND LOWER(COALESCE(s.status, '')) IN ('accepted', 'ac', 'pass')
                 GROUP BY p.id, p.title, p.difficulty
-                ORDER BY solvedAt DESC
+                ORDER BY "solvedAt" DESC
                 LIMIT 4
             `, [userId]);
+            const recentProblemsNormalized = recentProblems.map((row) => ({
+                title: row.title,
+                difficulty: row.difficulty,
+                solvedAt: row.solvedAt || row.solvedat || row.createdAt || row.createdat || null
+            }));
 
             const last7 = await dbAll(`
-                SELECT strftime('%Y-%m-%d', createdAt) AS dayKey, COUNT(*) AS cnt
+                SELECT strftime('%Y-%m-%d', createdAt) AS "dayKey", COUNT(*) AS cnt
                 FROM submissions
                 WHERE user_id = ?
                   AND LOWER(COALESCE(status, '')) IN ('accepted', 'ac', 'pass')
                   AND DATE(createdAt) >= DATE('now', '-6 days')
-                GROUP BY dayKey
+                GROUP BY 1
             `, [userId]);
-            const last7Map = new Map(last7.map(r => [String(r.dayKey), Number(r.cnt || 0)]));
+            const last7Map = new Map(
+                last7
+                    .map((r) => [localDateKey(r.dayKey || r.daykey), Number(r.cnt || 0)])
+                    .filter(([k]) => !!k)
+            );
             const activityLabels = [];
             const activityData = [];
             for (let i = 6; i >= 0; i -= 1) {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
-                const key = d.toISOString().slice(0, 10);
+                const key = localDateKey(d);
                 activityLabels.push(d.toLocaleDateString('en-US', { weekday: 'short' }));
                 activityData.push(last7Map.get(key) || 0);
             }
 
             const heatRows = await dbAll(`
-                SELECT strftime('%Y-%m-%d', createdAt) AS dayKey, COUNT(*) AS cnt
+                SELECT strftime('%Y-%m-%d', createdAt) AS "dayKey", COUNT(*) AS cnt
                 FROM submissions
                 WHERE user_id = ?
                   AND LOWER(COALESCE(status, '')) IN ('accepted', 'ac', 'pass')
                   AND DATE(createdAt) >= DATE('now', '-83 days')
-                GROUP BY dayKey
+                GROUP BY 1
             `, [userId]);
-            const heatMap = new Map(heatRows.map(r => [String(r.dayKey), Number(r.cnt || 0)]));
+            const heatMap = new Map(
+                heatRows
+                    .map((r) => [localDateKey(r.dayKey || r.daykey), Number(r.cnt || 0)])
+                    .filter(([k]) => !!k)
+            );
             const heatmapData = [];
             for (let i = 83; i >= 0; i -= 1) {
                 const d = new Date();
                 d.setDate(d.getDate() - i);
-                const key = d.toISOString().slice(0, 10);
+                const key = localDateKey(d);
                 heatmapData.push({
                     date: key,
                     value: heatMap.get(key) || 0
@@ -233,7 +390,7 @@ module.exports = (db) => {
                     levelTargetXp: levelEnd,
                     levelProgress: progress,
                     xpToNext,
-                    recentProblems,
+                    recentProblems: recentProblemsNormalized,
                     activityLabels,
                     activityData,
                     heatmapData
@@ -247,16 +404,12 @@ module.exports = (db) => {
 
     router.get('/api/report-data', requireIndividual, async (req, res) => {
         try {
-            const userId = Number(req.session?.user?.id);
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
-
-            const user = await dbGet(`
-                SELECT id, fullName, email, points, solvedCount, rank
-                FROM account_users
-                WHERE id = ?
-            `, [userId]);
+            const user = resolvedUser;
             if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
             const points = Number(user.points || 0);
@@ -369,16 +522,12 @@ module.exports = (db) => {
     router.get('/api/profile-data', requireIndividual, async (req, res) => {
         try {
             await ensureProfileColumns();
-            const userId = Number(req.session?.user?.id);
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
-
-            const user = await dbGet(`
-                SELECT id, fullName, email, points, solvedCount, rank, role, github_link, location
-                FROM account_users
-                WHERE id = ?
-            `, [userId]);
+            const user = resolvedUser;
             if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
             const points = Number(user.points || 0);
@@ -484,7 +633,8 @@ module.exports = (db) => {
     router.post('/api/profile', requireIndividual, async (req, res) => {
         try {
             await ensureProfileColumns();
-            const userId = Number(req.session?.user?.id);
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
@@ -498,21 +648,38 @@ module.exports = (db) => {
                 return res.status(400).json({ success: false, error: 'Full name and email are required' });
             }
 
-            const emailOwner = await dbGet(`SELECT id FROM account_users WHERE LOWER(email) = LOWER(?) AND id != ?`, [email, userId]);
+            const emailOwner = await dbGet(`
+                SELECT id FROM account_users
+                WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                  AND LOWER(COALESCE(role, '')) = 'individual'
+                  AND id != ?
+            `, [email, userId]);
             if (emailOwner) {
                 return res.status(409).json({ success: false, error: 'Email already in use' });
             }
 
-            await new Promise((resolve, reject) => {
-                db.run(`
-                    UPDATE account_users
-                    SET fullName = ?, email = ?, github_link = ?, location = ?
-                    WHERE id = ?
-                `, [fullName, email, githubLink, location, userId], function (err) {
-                    if (err) return reject(err);
-                    resolve();
-                });
-            });
+            const targetTable = resolvedUser?.sourceTable === 'users' ? 'users' : 'student';
+            await dbRun(`
+                UPDATE ${targetTable}
+                SET fullName = ?, email = ?, github_link = ?, location = ?
+                WHERE id = ?
+            `, [fullName, email, githubLink, location, userId]);
+            if (targetTable === 'student') {
+                await Promise.allSettled([
+                    dbRun(`
+                        UPDATE users
+                        SET fullName = ?, email = ?, github_link = ?, location = ?
+                        WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                          AND LOWER(COALESCE(role, '')) = 'individual'
+                    `, [fullName, email, githubLink, location, String(req.session?.user?.email || email)]),
+                    dbRun(`
+                        UPDATE users
+                        SET fullName = ?, email = ?, github_link = ?, location = ?
+                        WHERE id = ?
+                          AND LOWER(COALESCE(role, '')) = 'individual'
+                    `, [fullName, email, githubLink, location, userId])
+                ]);
+            }
 
             if (req.session?.user) {
                 req.session.user.fullName = fullName;
@@ -531,16 +698,12 @@ module.exports = (db) => {
 
     router.get('/api/stats-data', requireIndividual, async (req, res) => {
         try {
-            const userId = Number(req.session?.user?.id);
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
-
-            const user = await dbGet(`
-                SELECT id, fullName, email, points, solvedCount, role
-                FROM account_users
-                WHERE id = ?
-            `, [userId]);
+            const user = resolvedUser;
             if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
             const points = Number(user.points || 0);
@@ -715,18 +878,12 @@ module.exports = (db) => {
     // 1. Fetch user data for the settings page
     router.get('/api/settings-data', requireIndividual, async (req, res) => {
         try {
-            const userId = Number(req.session?.user?.id);
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
-
-            const user = await dbGet(`
-                SELECT id, fullName, email, mobile, gender, course, program, department, branch, year, section,
-                       notif_contest_alerts, notif_submission_results, notif_deadline_reminders,
-                       points, solvedCount, rank
-                FROM account_users
-                WHERE id = ?
-            `, [userId]);
+            const user = resolvedUser;
 
             if (!user) return res.status(404).json({ success: false, error: 'User not found' });
 
@@ -746,10 +903,239 @@ module.exports = (db) => {
         }
     });
 
+    router.get('/api/problem-notes/:problemId', requireIndividual, async (req, res) => {
+        try {
+            await ensureProblemNotesTable();
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
+            const problemId = Number(req.params.problemId);
+            if (!Number.isInteger(userId) || userId <= 0) {
+                return res.status(401).json({ success: false, error: 'Unauthorized' });
+            }
+            if (!Number.isInteger(problemId) || problemId <= 0) {
+                return res.status(400).json({ success: false, error: 'Invalid problem id' });
+            }
+
+            const row = await dbGet(`
+                SELECT before_plan, approach, edge_cases, complexity, mistakes, revision, tags,
+                       revise_bucket, is_pinned, createdAt, updatedAt
+                FROM individual_problem_notes
+                WHERE user_id = ? AND problem_id = ?
+            `, [userId, problemId]);
+
+            const entries = await dbAll(`
+                SELECT entry_id, status, language, passed_count, total_count,
+                       used_method, best_method, previous_approach, approach_snapshot, createdAt
+                FROM individual_problem_note_entries
+                WHERE user_id = ? AND problem_id = ?
+                ORDER BY createdAt DESC
+                LIMIT 100
+            `, [userId, problemId]);
+
+            return res.json({
+                success: true,
+                note: row || {
+                    before_plan: '',
+                    approach: '',
+                    edge_cases: '',
+                    complexity: '',
+                    mistakes: '',
+                    revision: '',
+                    tags: '',
+                    revise_bucket: '',
+                    is_pinned: 0,
+                    createdAt: null,
+                    updatedAt: null
+                },
+                entries: Array.isArray(entries) ? entries : []
+            });
+        } catch (error) {
+            console.error('Individual problem note fetch error:', error);
+            return res.status(500).json({ success: false, error: 'Failed to load notes' });
+        }
+    });
+
+    router.post('/api/problem-notes/:problemId', requireIndividual, async (req, res) => {
+        try {
+            await ensureProblemNotesTable();
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
+            const problemId = Number(req.params.problemId);
+            if (!Number.isInteger(userId) || userId <= 0) {
+                return res.status(401).json({ success: false, error: 'Unauthorized' });
+            }
+            if (!Number.isInteger(problemId) || problemId <= 0) {
+                return res.status(400).json({ success: false, error: 'Invalid problem id' });
+            }
+
+            const payload = req.body || {};
+            const sanitize = (v, max = 6000) => String(v || '').trim().slice(0, max);
+            const beforePlan = sanitize(payload.beforePlan);
+            const approach = sanitize(payload.approach);
+            const edgeCases = sanitize(payload.edgeCases);
+            const complexity = sanitize(payload.complexity, 2000);
+            const mistakes = sanitize(payload.mistakes);
+            const revision = sanitize(payload.revision);
+            const tags = sanitize(payload.tags, 500);
+            const reviseBucket = sanitize(payload.reviseBucket, 50);
+            const isPinned = payload.isPinned ? 1 : 0;
+
+            const existing = await dbGet(
+                `SELECT user_id FROM individual_problem_notes WHERE user_id = ? AND problem_id = ?`,
+                [userId, problemId]
+            );
+
+            if (existing) {
+                await dbRun(`
+                    UPDATE individual_problem_notes
+                    SET before_plan = ?, approach = ?, edge_cases = ?, complexity = ?, mistakes = ?,
+                        revision = ?, tags = ?, revise_bucket = ?, is_pinned = ?, updatedAt = CURRENT_TIMESTAMP
+                    WHERE user_id = ? AND problem_id = ?
+                `, [beforePlan, approach, edgeCases, complexity, mistakes, revision, tags, reviseBucket, isPinned, userId, problemId]);
+            } else {
+                await dbRun(`
+                    INSERT INTO individual_problem_notes (
+                        user_id, problem_id, before_plan, approach, edge_cases, complexity, mistakes,
+                        revision, tags, revise_bucket, is_pinned, createdAt, updatedAt
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                `, [userId, problemId, beforePlan, approach, edgeCases, complexity, mistakes, revision, tags, reviseBucket, isPinned]);
+            }
+
+            return res.json({ success: true, message: 'Notes saved' });
+        } catch (error) {
+            console.error('Individual problem note save error:', error);
+            return res.status(500).json({ success: false, error: 'Failed to save notes' });
+        }
+    });
+
+    router.post('/api/problem-notes/:problemId/solve-entry', requireIndividual, async (req, res) => {
+        try {
+            await ensureProblemNotesTable();
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
+            const problemId = Number(req.params.problemId);
+            if (!Number.isInteger(userId) || userId <= 0) {
+                return res.status(401).json({ success: false, error: 'Unauthorized' });
+            }
+            if (!Number.isInteger(problemId) || problemId <= 0) {
+                return res.status(400).json({ success: false, error: 'Invalid problem id' });
+            }
+
+            const payload = req.body || {};
+            const sanitize = (v, max = 10000) => String(v || '').trim().slice(0, max);
+            const status = sanitize(payload.status, 50).toLowerCase();
+            if (!['accepted', 'ac', 'pass'].includes(status)) {
+                return res.json({ success: true, skipped: true, message: 'Entry skipped for non-accepted status' });
+            }
+
+            const language = sanitize(payload.language, 20);
+            const passedCount = Math.max(0, Number(payload.passedCount || payload.passed || 0) || 0);
+            const totalCount = Math.max(0, Number(payload.totalCount || payload.total || 0) || 0);
+            const codeSnapshot = sanitize(payload.code, 20000);
+            const approachSnapshot = sanitize(payload.approachSnapshot || payload.approach, 6000);
+            const previousApproach = sanitize(payload.previousApproach, 6000);
+            const usedMethod = sanitize(payload.usedMethod, 200) || detectMethodFromCode(codeSnapshot);
+
+            const problem = await dbGet(`
+                SELECT title, difficulty, tags
+                FROM problems
+                WHERE id = ?
+            `, [problemId]);
+            const bestMethod = suggestBestMethod(problem?.title, problem?.difficulty, problem?.tags);
+            const entryId = `${userId}-${problemId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+            await dbRun(`
+                INSERT INTO individual_problem_note_entries (
+                    entry_id, user_id, problem_id, status, language, passed_count, total_count,
+                    used_method, best_method, previous_approach, approach_snapshot, code_snapshot, createdAt
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            `, [entryId, userId, problemId, status, language, passedCount, totalCount, usedMethod, bestMethod, previousApproach, approachSnapshot, codeSnapshot]);
+
+            return res.json({ success: true, entryId, usedMethod, bestMethod });
+        } catch (error) {
+            console.error('Individual problem solve-entry save error:', error);
+            return res.status(500).json({ success: false, error: 'Failed to save solve entry' });
+        }
+    });
+
+    router.get('/api/problem-notes/:problemId/download', requireIndividual, async (req, res) => {
+        try {
+            await ensureProblemNotesTable();
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
+            const problemId = Number(req.params.problemId);
+            if (!Number.isInteger(userId) || userId <= 0) {
+                return res.status(401).json({ success: false, error: 'Unauthorized' });
+            }
+            if (!Number.isInteger(problemId) || problemId <= 0) {
+                return res.status(400).json({ success: false, error: 'Invalid problem id' });
+            }
+
+            const problem = await dbGet(`SELECT title FROM problems WHERE id = ?`, [problemId]);
+            const base = await dbGet(`
+                SELECT before_plan, approach, edge_cases, complexity, mistakes, revision, tags, revise_bucket, is_pinned, updatedAt
+                FROM individual_problem_notes
+                WHERE user_id = ? AND problem_id = ?
+            `, [userId, problemId]);
+            const entries = await dbAll(`
+                SELECT status, language, passed_count, total_count, used_method, best_method, previous_approach, approach_snapshot, createdAt
+                FROM individual_problem_note_entries
+                WHERE user_id = ? AND problem_id = ?
+                ORDER BY createdAt DESC
+            `, [userId, problemId]);
+
+            const title = String(problem?.title || `Problem-${problemId}`);
+            const lines = [];
+            lines.push(`CampusCode Problem Notes`);
+            lines.push(`Problem: ${title} (ID: ${problemId})`);
+            lines.push(`User ID: ${userId}`);
+            lines.push(`Generated At: ${new Date().toISOString()}`);
+            lines.push('');
+            lines.push('=== Master Note ===');
+            lines.push(`Before Plan: ${base?.before_plan || ''}`);
+            lines.push(`Approach: ${base?.approach || ''}`);
+            lines.push(`Edge Cases: ${base?.edge_cases || ''}`);
+            lines.push(`Complexity: ${base?.complexity || ''}`);
+            lines.push(`Mistakes: ${base?.mistakes || ''}`);
+            lines.push(`Revision: ${base?.revision || ''}`);
+            lines.push(`Tags: ${base?.tags || ''}`);
+            lines.push(`Revision Bucket: ${base?.revise_bucket || ''}`);
+            lines.push(`Pinned: ${Number(base?.is_pinned || 0) === 1 ? 'Yes' : 'No'}`);
+            lines.push('');
+            lines.push('=== Solve History ===');
+
+            if (!entries.length) {
+                lines.push('No solved-note entries found yet.');
+            } else {
+                entries.forEach((e, idx) => {
+                    lines.push(``);
+                    lines.push(`# ${idx + 1}`);
+                    lines.push(`When: ${e.createdAt || ''}`);
+                    lines.push(`Status: ${String(e.status || '').toUpperCase()}`);
+                    lines.push(`Language: ${e.language || ''}`);
+                    lines.push(`Cases: ${Number(e.passed_count || 0)}/${Number(e.total_count || 0)}`);
+                    lines.push(`Used Method: ${e.used_method || ''}`);
+                    lines.push(`Best Method: ${e.best_method || ''}`);
+                    lines.push(`Previous Approach: ${e.previous_approach || ''}`);
+                    lines.push(`Approach Snapshot: ${e.approach_snapshot || ''}`);
+                });
+            }
+
+            const filename = `problem-${problemId}-notes.txt`;
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            return res.send(lines.join('\n'));
+        } catch (error) {
+            console.error('Individual notes download error:', error);
+            return res.status(500).json({ success: false, error: 'Failed to download notes' });
+        }
+    });
+
     // 2. Save updated data from the settings page
     router.post('/api/update-profile', requireIndividual, async (req, res) => {
         try {
-            const userId = Number(req.session?.user?.id);
+            const resolvedUser = await resolveIndividualUser(req.session?.user);
+            const userId = Number(resolvedUser?.id);
             if (!Number.isInteger(userId) || userId <= 0) {
                 return res.status(401).json({ success: false, error: 'Unauthorized' });
             }
@@ -760,8 +1146,9 @@ module.exports = (db) => {
                 notifContestAlerts, notifSubmissionResults, notifDeadlineReminders
             } = req.body;
 
+            const targetTable = resolvedUser?.sourceTable === 'users' ? 'users' : 'student';
             const updateQuery = `
-                UPDATE account_users
+                UPDATE ${targetTable}
                 SET fullName = ?, email = ?, mobile = ?, gender = ?,
                     course = ?, program = ?, department = ?, branch = ?, year = ?, section = ?,
                     notif_contest_alerts = ?, notif_submission_results = ?, notif_deadline_reminders = ?
@@ -777,6 +1164,26 @@ module.exports = (db) => {
                 if (err) {
                     console.error('Update DB error:', err);
                     return res.status(500).json({ success: false, error: 'Failed to save changes' });
+                }
+                if (targetTable === 'student') {
+                    db.run(`
+                        UPDATE users
+                        SET fullName = ?, email = ?, mobile = ?, gender = ?,
+                            course = ?, program = ?, department = ?, branch = ?, year = ?, section = ?,
+                            notif_contest_alerts = ?, notif_submission_results = ?, notif_deadline_reminders = ?
+                        WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                          AND LOWER(COALESCE(role, '')) = 'individual'
+                    `, [
+                        fullName, email, mobile, gender,
+                        course, program, department, branch, year, section,
+                        notifContestAlerts ? 1 : 0, notifSubmissionResults ? 1 : 0, notifDeadlineReminders ? 1 : 0,
+                        String(req.session?.user?.email || email)
+                    ], () => {});
+                }
+                if (req.session?.user) {
+                    req.session.user.fullName = fullName;
+                    req.session.user.name = fullName;
+                    req.session.user.email = email;
                 }
                 res.json({ success: true, message: 'Settings updated successfully' });
             });

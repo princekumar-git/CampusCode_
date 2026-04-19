@@ -571,11 +571,11 @@ module.exports = (db) => {
                 (
                     SELECT COUNT(*) + 1
                     FROM account_users u2
-                    WHERE u2.role = 'student'
+                    WHERE LOWER(COALESCE(u2.role, '')) = 'student'
                       AND COALESCE(u2.points, 0) > COALESCE(u.points, 0)
                 ) AS globalRank
             FROM account_users u
-            WHERE u.role = 'student' AND u.collegeName = ?
+            WHERE LOWER(COALESCE(u.role, '')) = 'student' AND u.collegeName = ?
         `;
         let params = [user.collegeName];
 
@@ -585,7 +585,10 @@ module.exports = (db) => {
         } else if (user.role === 'faculty' || user.role === 'hos') {
             query += ` AND EXISTS (
                 SELECT 1 FROM student_assignments sa 
-                JOIN faculty_assignments fa ON sa.subject = fa.subject AND sa.year = fa.year AND sa.section = fa.section
+                JOIN faculty_assignments fa ON
+                    LOWER(TRIM(COALESCE(sa.subject, ''))) = LOWER(TRIM(COALESCE(fa.subject, '')))
+                    AND TRIM(COALESCE(CAST(sa.year AS TEXT), '')) = TRIM(COALESCE(CAST(fa.year AS TEXT), ''))
+                    AND LOWER(TRIM(COALESCE(sa.section, ''))) = LOWER(TRIM(COALESCE(fa.section, '')))
                 WHERE sa.user_id = u.id AND fa.user_id = ?
             )`;
             params.push(user.id);
@@ -893,7 +896,7 @@ module.exports = (db) => {
                        JOIN problems p ON p.id = s.problem_id 
                        JOIN account_users u ON u.id = s.user_id 
                        WHERE p.faculty_id = ? AND LOWER(COALESCE(s.status, '')) IN ('accepted', 'ac') 
-                       GROUP BY u.id ORDER BY count DESC LIMIT 5`, [user.id]),
+                       GROUP BY u.id, u.fullName ORDER BY count DESC LIMIT 5`, [user.id]),
                 runQuery(`SELECT * FROM (
                         SELECT 'problem' as type, title, createdAt FROM problems WHERE faculty_id = ?
                         UNION ALL
@@ -945,11 +948,12 @@ module.exports = (db) => {
         Promise.all([
             // 0 - Monthly submissions trend
             runQuery(
-                `SELECT strftime('%m', s.createdAt) as month, COUNT(*) as count
+                `SELECT TO_CHAR(CAST(s.createdAt AS TIMESTAMP), 'MM') as month, COUNT(*) as count
                  FROM submissions s
                  JOIN problems p ON p.id = s.problem_id
                  WHERE p.faculty_id = ?
-                 GROUP BY strftime('%m', s.createdAt)`,
+                   AND NULLIF(TRIM(CAST(s.createdAt AS TEXT)), '') IS NOT NULL
+                 GROUP BY TO_CHAR(CAST(s.createdAt AS TIMESTAMP), 'MM')`,
                 [user.id]
             ),
             // 1 - Difficulty breakdown
@@ -1001,7 +1005,7 @@ module.exports = (db) => {
                  JOIN account_users u ON u.id = s.user_id
                  WHERE p.faculty_id = ?
                    AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass')
-                 GROUP BY s.user_id ORDER BY solved DESC LIMIT 5`,
+                 GROUP BY s.user_id, u.fullName, u.year, u.section, u.points ORDER BY solved DESC LIMIT 5`,
                 [user.id]
             ),
             // 8 - Subject breakdown
@@ -1014,19 +1018,20 @@ module.exports = (db) => {
             // 9 - Recent contests
             runQuery(
                 `SELECT title, status,
-                        COALESCE(startDate,'') as startDate,
-                        COALESCE(endDate,'') as endDate
+                        COALESCE(CAST(startDate AS TEXT),'') as startDate,
+                        COALESCE(CAST(endDate AS TEXT),'') as endDate
                  FROM contests WHERE createdBy = ?
                  ORDER BY createdAt DESC LIMIT 6`,
                 [user.id]
             ),
             // 10 - Weekly submissions (last 7 weeks)
             runQuery(
-                `SELECT strftime('%W', s.createdAt) as week, COUNT(*) as count
+                `SELECT TO_CHAR(CAST(s.createdAt AS TIMESTAMP), 'WW') as week, COUNT(*) as count
                  FROM submissions s
                  JOIN problems p ON p.id = s.problem_id
                  WHERE p.faculty_id = ?
-                   AND s.createdAt >= date('now', '-49 days')
+                   AND NULLIF(TRIM(CAST(s.createdAt AS TEXT)), '') IS NOT NULL
+                   AND CAST(s.createdAt AS TIMESTAMP) >= (CURRENT_DATE - INTERVAL '49 days')
                  GROUP BY week ORDER BY week ASC`,
                 [user.id]
             )
@@ -1125,17 +1130,17 @@ module.exports = (db) => {
         const weekLabels = ['6w ago','5w ago','4w ago','3w ago','2w ago','Last wk','This wk'];
 
         Promise.all([
-            runQuery(`SELECT strftime('%m', s.createdAt) as month, COUNT(*) as count FROM submissions s JOIN problems p ON p.id = s.problem_id WHERE p.faculty_id = ? GROUP BY strftime('%m', s.createdAt)`, [user.id]),
+            runQuery(`SELECT TO_CHAR(CAST(s.createdAt AS TIMESTAMP), 'MM') as month, COUNT(*) as count FROM submissions s JOIN problems p ON p.id = s.problem_id WHERE p.faculty_id = ? AND NULLIF(TRIM(CAST(s.createdAt AS TEXT)), '') IS NOT NULL GROUP BY TO_CHAR(CAST(s.createdAt AS TIMESTAMP), 'MM')`, [user.id]),
             runQuery(`SELECT difficulty, COUNT(*) as count FROM problems WHERE faculty_id = ? GROUP BY difficulty`, [user.id]),
             getSingle(`SELECT COUNT(*) as count FROM problems WHERE faculty_id = ?`, [user.id]),
             getSingle(`SELECT COUNT(*) as count FROM contests WHERE createdBy = ?`, [user.id]),
             getSingle(`SELECT COUNT(DISTINCT s.user_id) as count FROM submissions s JOIN problems p ON p.id = s.problem_id WHERE p.faculty_id = ?`, [user.id]),
             getSingle(`SELECT COUNT(*) as total, SUM(CASE WHEN LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') THEN 1 ELSE 0 END) as accepted FROM submissions s JOIN problems p ON p.id = s.problem_id WHERE p.faculty_id = ?`, [user.id]),
             runQuery(`SELECT p.title, p.difficulty, COUNT(s.id) as submissions, SUM(CASE WHEN LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') THEN 1 ELSE 0 END) as accepted FROM problems p LEFT JOIN submissions s ON s.problem_id = p.id WHERE p.faculty_id = ? GROUP BY p.id ORDER BY submissions DESC LIMIT 5`, [user.id]),
-            runQuery(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved, COALESCE(u.points,0) as points FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.faculty_id = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id ORDER BY solved DESC LIMIT 5`, [user.id]),
+            runQuery(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved, COALESCE(u.points,0) as points FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.faculty_id = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id, u.fullName, u.year, u.section, u.points ORDER BY solved DESC LIMIT 5`, [user.id]),
             runQuery(`SELECT COALESCE(NULLIF(subject,''),'Unassigned') as subject, COUNT(*) as count FROM problems WHERE faculty_id = ? GROUP BY subject ORDER BY count DESC LIMIT 6`, [user.id]),
-            runQuery(`SELECT title, status, COALESCE(startDate,'') as startDate, COALESCE(endDate,'') as endDate FROM contests WHERE createdBy = ? ORDER BY createdAt DESC LIMIT 6`, [user.id]),
-            runQuery(`SELECT strftime('%W', s.createdAt) as week, COUNT(*) as count FROM submissions s JOIN problems p ON p.id = s.problem_id WHERE p.faculty_id = ? AND s.createdAt >= date('now', '-49 days') GROUP BY week ORDER BY week ASC`, [user.id])
+            runQuery(`SELECT title, status, COALESCE(CAST(startDate AS TEXT),'') as startDate, COALESCE(CAST(endDate AS TEXT),'') as endDate FROM contests WHERE createdBy = ? ORDER BY createdAt DESC LIMIT 6`, [user.id]),
+            runQuery(`SELECT TO_CHAR(CAST(s.createdAt AS TIMESTAMP), 'WW') as week, COUNT(*) as count FROM submissions s JOIN problems p ON p.id = s.problem_id WHERE p.faculty_id = ? AND NULLIF(TRIM(CAST(s.createdAt AS TEXT)), '') IS NOT NULL AND CAST(s.createdAt AS TIMESTAMP) >= (CURRENT_DATE - INTERVAL '49 days') GROUP BY week ORDER BY week ASC`, [user.id])
         ]).then(([monthlyRows, difficultyRows, problemsRow, contestsRow, activeStudentsRow, submissionStats, topProblems, topStudents, subjectBreakdown, recentContests, weeklyRows]) => {
             const monthlyByMonth = {};
             (monthlyRows || []).forEach(r => { monthlyByMonth[r.month] = Number(r.count || 0); });

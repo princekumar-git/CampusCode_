@@ -578,25 +578,46 @@
             if(bannerName) bannerName.textContent = college.name;
 
             const metrics = college.metrics || {};
+            const programsLen = (college.programs || []).length;
+            const branchesLen = (college.branches || []).length;
+            const sectionsLen = (college.sections || []).length;
+            const subjectsLen = (college.subjects || []).length;
+            const studentUsersLen = (college.users?.students || []).length;
+            const facultyUsersLen = (college.users?.faculty || []).length;
+            const problemsLen = (college.problems || []).length;
+            const contestsLen = (college.contests || []).length;
+            const toCount = (metricValue, fallback) => {
+                const n = Number(metricValue);
+                return Number.isFinite(n) && n > 0 ? n : Number(fallback || 0);
+            };
             document.getElementById('college-university').value = college.university || '';
             document.getElementById('college-accreditation').value = college.accreditation || '';
 
-            document.getElementById('metric-programs').textContent = metrics.programCount || 0;
-            document.getElementById('metric-branches').textContent = metrics.branchCount || 0;
-            document.getElementById('metric-students').textContent = metrics.studentCount || 0;
-            document.getElementById('metric-faculty').textContent = metrics.facultyCount || 0;
-            document.getElementById('metric-sections').textContent = metrics.sectionCount || 0;
-            document.getElementById('metric-subjects').textContent = metrics.subjectCount || 0;
+            const programCount = toCount(metrics.programCount, programsLen);
+            const branchCount = toCount(metrics.branchCount, branchesLen);
+            const sectionCount = toCount(metrics.sectionCount, sectionsLen);
+            const subjectCount = toCount(metrics.subjectCount, subjectsLen);
+            const studentCount = toCount(metrics.studentCount, studentUsersLen);
+            const facultyCount = toCount(metrics.facultyCount, facultyUsersLen);
+            const problemCount = toCount(metrics.problemCount, problemsLen);
+            const contestCount = toCount(metrics.contestCount, contestsLen);
+
+            document.getElementById('metric-programs').textContent = programCount;
+            document.getElementById('metric-branches').textContent = branchCount;
+            document.getElementById('metric-students').textContent = studentCount;
+            document.getElementById('metric-faculty').textContent = facultyCount;
+            document.getElementById('metric-sections').textContent = sectionCount;
+            document.getElementById('metric-subjects').textContent = subjectCount;
             
-            document.getElementById('academic-programs').textContent = metrics.programCount || 0;
-            document.getElementById('academic-branches').textContent = metrics.branchCount || 0;
-            document.getElementById('academic-sections').textContent = metrics.sectionCount || 0;
-            document.getElementById('academic-subjects').textContent = metrics.subjectCount || 0;
+            document.getElementById('academic-programs').textContent = programCount;
+            document.getElementById('academic-branches').textContent = branchCount;
+            document.getElementById('academic-sections').textContent = sectionCount;
+            document.getElementById('academic-subjects').textContent = subjectCount;
             
-            document.getElementById('users-students').textContent = metrics.studentCount || 0;
-            document.getElementById('users-faculty').textContent = metrics.facultyCount || 0;
-            document.getElementById('content-problems').textContent = metrics.problemCount || 0;
-            document.getElementById('content-contests').textContent = metrics.contestCount || 0;
+            document.getElementById('users-students').textContent = studentCount;
+            document.getElementById('users-faculty').textContent = facultyCount;
+            document.getElementById('content-problems').textContent = problemCount;
+            document.getElementById('content-contests').textContent = contestCount;
             
             renderSimpleList('list-programs', college.programs || [], 'fa-graduation-cap', 'text-blue-500 bg-blue-50 dark:bg-blue-900/30');
             renderSimpleList('list-branches', college.branches || [], 'fa-code-branch', 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30');
@@ -749,6 +770,15 @@
             const branches = scope.effectiveBranchId === 'all' ? scope.scopedBranchesByProgram : scope.scopedBranchesByProgram.filter((b) => String(b.id) === String(scope.effectiveBranchId));
             const sections = scope.effectiveSectionId === 'all' ? scope.scopedSectionsByBranch : scope.scopedSectionsByBranch.filter((s) => String(s.id) === String(scope.effectiveSectionId));
             const subjects = scope.effectiveSubjectId === 'all' ? scope.scopedSubjects : scope.scopedSubjects.filter((s) => String(s.id) === String(scope.effectiveSubjectId));
+
+            const progBadge = document.getElementById('academic-programs');
+            const branchBadge = document.getElementById('academic-branches');
+            const sectionBadge = document.getElementById('academic-sections');
+            const subjectBadge = document.getElementById('academic-subjects');
+            if (progBadge) progBadge.textContent = progs.length;
+            if (branchBadge) branchBadge.textContent = branches.length;
+            if (sectionBadge) sectionBadge.textContent = sections.length;
+            if (subjectBadge) subjectBadge.textContent = subjects.length;
 
             renderSimpleList('list-programs', progs, 'fa-graduation-cap', 'text-blue-500 bg-blue-50 dark:bg-blue-900/30');
             renderSimpleList('list-branches', branches, 'fa-code-branch', 'text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30');

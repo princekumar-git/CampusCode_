@@ -643,15 +643,62 @@
                 });
             }
 
+            const parseServerDate = (value) => {
+                if (!value) return null;
+                if (value instanceof Date) return value;
+                const raw = String(value).trim();
+                if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
+                    const localCandidate = new Date(raw.replace(' ', 'T'));
+                    const utcCandidate = new Date(`${raw.replace(' ', 'T')}Z`);
+                    const localOk = !Number.isNaN(localCandidate.getTime());
+                    const utcOk = !Number.isNaN(utcCandidate.getTime());
+                    if (localOk && !utcOk) return localCandidate;
+                    if (!localOk && utcOk) return utcCandidate;
+                    if (!localOk && !utcOk) return null;
+                    // Pick interpretation closest to now (handles mixed DB timestamp styles).
+                    const now = Date.now();
+                    const localDelta = Math.abs(now - localCandidate.getTime());
+                    const utcDelta = Math.abs(now - utcCandidate.getTime());
+                    return localDelta <= utcDelta ? localCandidate : utcCandidate;
+                }
+                if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
+                    const localCandidate = new Date(raw);
+                    const utcCandidate = new Date(`${raw}Z`);
+                    const localOk = !Number.isNaN(localCandidate.getTime());
+                    const utcOk = !Number.isNaN(utcCandidate.getTime());
+                    if (localOk && !utcOk) return localCandidate;
+                    if (!localOk && utcOk) return utcCandidate;
+                    if (!localOk && !utcOk) return null;
+                    const now = Date.now();
+                    const localDelta = Math.abs(now - localCandidate.getTime());
+                    const utcDelta = Math.abs(now - utcCandidate.getTime());
+                    return localDelta <= utcDelta ? localCandidate : utcCandidate;
+                }
+                const dt = new Date(raw);
+                return Number.isNaN(dt.getTime()) ? null : dt;
+            };
+            const localDateKey = (value) => {
+                const d = parseServerDate(value);
+                if (!d) return '';
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+            };
             const formatAgo = (dateValue) => {
-                if (!dateValue) return '';
-                const then = new Date(dateValue);
-                const now = new Date();
-                const diffMs = now - then;
+                const then = parseServerDate(dateValue);
+                if (!then) return 'Recently';
+                const now = Date.now();
+                const diffMs = now - then.getTime();
+                const diffMin = Math.floor(diffMs / (1000 * 60));
+                const diffHour = Math.floor(diffMs / (1000 * 60 * 60));
                 const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                if (diffDays <= 0) return 'today';
+                if (diffMin < 1) return 'Just now';
+                if (diffMin < 60) return `${diffMin}m ago`;
+                if (diffHour < 24) return `${diffHour}h ago`;
                 if (diffDays === 1) return '1 day ago';
-                return `${diffDays} days ago`;
+                if (diffDays < 30) return `${diffDays} days ago`;
+                return then.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
             };
 
             const difficultyBadgeClass = (difficulty) => {
@@ -769,7 +816,7 @@
                         for (let i = 0; i < 84; i += 1) {
                             const cellDate = new Date(startMonday);
                             cellDate.setDate(startMonday.getDate() + i);
-                            const key = cellDate.toISOString().slice(0, 10);
+                            const key = localDateKey(cellDate);
                             const value = sourceMap.get(key) || 0;
                             const div = document.createElement('div');
                             div.className = 'heat-hex heat-cell';

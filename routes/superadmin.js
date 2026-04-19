@@ -14,6 +14,60 @@ module.exports = (db) => {
             resolve(this);
         });
     });
+    const dedupeByEmail = (rows = []) => {
+        const seen = new Set();
+        const out = [];
+        for (const row of rows) {
+            const key = String(row?.email || '').trim().toLowerCase();
+            if (!key || seen.has(key)) continue;
+            seen.add(key);
+            out.push(row);
+        }
+        return out;
+    };
+    const getMergedAdminsByStatus = async (accountTable, status) => {
+        const statusNorm = String(status || '').trim().toLowerCase();
+        const primary = await dbAll(
+            `SELECT id, fullName, email, collegeName
+             FROM ${accountTable}
+             WHERE LOWER(COALESCE(role, '')) = 'admin'
+               AND LOWER(COALESCE(status, '')) = ?
+             ORDER BY id DESC`,
+            [statusNorm]
+        );
+        if (accountTable === 'faculty') return dedupeByEmail(primary);
+        const secondary = await dbAll(
+            `SELECT id, fullName, email, collegeName
+             FROM faculty
+             WHERE LOWER(COALESCE(role, '')) = 'admin'
+               AND LOWER(COALESCE(status, '')) = ?
+             ORDER BY id DESC`,
+            [statusNorm]
+        );
+        return dedupeByEmail([...(primary || []), ...(secondary || [])]);
+    };
+    const getMergedActiveAdminsByCollege = async (accountTable, collegeName) => {
+        const primary = await dbAll(
+            `SELECT id, fullName, email, collegeName
+             FROM ${accountTable}
+             WHERE LOWER(COALESCE(role, '')) = 'admin'
+               AND LOWER(COALESCE(status, '')) = 'active'
+               AND LOWER(TRIM(COALESCE(collegeName, ''))) = LOWER(TRIM(?))
+             ORDER BY id ASC`,
+            [collegeName]
+        );
+        if (accountTable === 'faculty') return dedupeByEmail(primary);
+        const secondary = await dbAll(
+            `SELECT id, fullName, email, collegeName
+             FROM faculty
+             WHERE LOWER(COALESCE(role, '')) = 'admin'
+               AND LOWER(COALESCE(status, '')) = 'active'
+               AND LOWER(TRIM(COALESCE(collegeName, ''))) = LOWER(TRIM(?))
+             ORDER BY id ASC`,
+            [collegeName]
+        );
+        return dedupeByEmail([...(primary || []), ...(secondary || [])]);
+    };
     const getAccountTable = async () => {
         const rows = await dbAll(`
             SELECT name
@@ -59,31 +113,17 @@ module.exports = (db) => {
     router.get('/api/colleges', requireRole('superadmin'), (req, res) => {
         (async () => {
             const accountTable = await getAccountTable();
-            db.all(`
-            SELECT
-                c.*,
-                COALESCE((
-                    SELECT GROUP_CONCAT(u.fullName, ', ')
-                    FROM ${accountTable} u
-                    WHERE LOWER(TRIM(u.collegeName)) = LOWER(TRIM(c.name))
-                      AND u.role = 'admin'
-                      AND u.status = 'active'
-                ), 'Not Assigned') AS adminNames,
-                COALESCE((
-                    SELECT u.fullName
-                    FROM ${accountTable} u
-                    WHERE LOWER(TRIM(u.collegeName)) = LOWER(TRIM(c.name))
-                      AND u.role = 'admin'
-                      AND u.status = 'active'
-                    ORDER BY u.id ASC
-                    LIMIT 1
-                ), 'Not Assigned') AS collegeAdmin
-            FROM colleges c
-            ORDER BY c.id DESC
-        `, [], (err, rows) => {
-            if (err) return res.status(500).json({ success: false, error: err.message });
+            const colleges = await dbAll(`SELECT * FROM colleges ORDER BY id DESC`, []);
+            const rows = [];
+            for (const college of colleges) {
+                const admins = await getMergedActiveAdminsByCollege(accountTable, college.name);
+                rows.push({
+                    ...college,
+                    adminNames: admins.length ? admins.map((a) => a.fullName).join(', ') : 'Not Assigned',
+                    collegeAdmin: admins[0]?.fullName || 'Not Assigned'
+                });
+            }
             res.json({ success: true, colleges: rows });
-        });
         })().catch((error) => res.status(500).json({ success: false, error: error.message }));
     });
 
@@ -142,14 +182,7 @@ module.exports = (db) => {
             const response = [];
             for (const college of colleges) {
                 const collegeName = String(college.name || '').trim();
-                const admins = await dbAll(`
-                    SELECT id, fullName, email
-                    FROM ${accountTable}
-                    WHERE LOWER(TRIM(COALESCE(collegeName, ''))) = LOWER(TRIM(?))
-                      AND LOWER(COALESCE(role, '')) = 'admin'
-                      AND LOWER(COALESCE(status, '')) = 'active'
-                    ORDER BY id ASC
-                `, [collegeName]);
+                const admins = await getMergedActiveAdminsByCollege(accountTable, collegeName);
 
                 let problemCount = 0;
                 if (hasProblemCreatedBy || hasProblemFacultyId) {
@@ -231,6 +264,20 @@ module.exports = (db) => {
                     ORDER BY c.id DESC
                 `, [collegeName, collegeName]);
 
+                const metricRow = metrics[0] || {};
+                const toNum = (v) => Number(v || 0);
+                const resolvedMetrics = {
+                    // Handle both SQLite alias casing and PostgreSQL lower-cased alias keys.
+                    programCount: toNum(metricRow.programCount ?? metricRow.programcount ?? programs.length),
+                    branchCount: toNum(metricRow.branchCount ?? metricRow.branchcount ?? branches.length),
+                    sectionCount: toNum(metricRow.sectionCount ?? metricRow.sectioncount ?? sections.length),
+                    subjectCount: toNum(metricRow.subjectCount ?? metricRow.subjectcount ?? subjects.length),
+                    studentCount: toNum(metricRow.studentCount ?? metricRow.studentcount ?? studentUsers.length),
+                    facultyCount: toNum(metricRow.facultyCount ?? metricRow.facultycount ?? facultyUsers.length),
+                    problemCount: toNum(problemCount ?? problemList.length),
+                    contestCount: toNum(contestCount ?? contestList.length)
+                };
+
                 response.push({
                     id: college.id,
                     name: collegeName,
@@ -239,25 +286,7 @@ module.exports = (db) => {
                     status: college.status || 'active',
                     adminNames: admins.map((a) => a.fullName),
                     admins,
-                    metrics: {
-                        ...(metrics[0] || {
-                            programCount: 0,
-                            branchCount: 0,
-                            sectionCount: 0,
-                            subjectCount: 0,
-                            studentCount: 0,
-                            facultyCount: 0
-                        }),
-                        problemCount,
-                        contestCount
-                    } || {
-                        programCount: 0,
-                        branchCount: 0,
-                        sectionCount: 0,
-                        subjectCount: 0,
-                        studentCount: 0,
-                        facultyCount: 0,
-                    },
+                    metrics: resolvedMetrics,
                     programs,
                     branches,
                     sections,
@@ -285,10 +314,8 @@ module.exports = (db) => {
     router.get('/api/pending-admins', requireRole('superadmin'), (req, res) => {
         (async () => {
             const accountTable = await getAccountTable();
-            db.all(`SELECT id, fullName, email, collegeName FROM ${accountTable} WHERE role = 'admin' AND status = 'pending' ORDER BY id DESC`, [], (err, rows) => {
-                if (err) return res.status(500).json({ success: false, error: err.message });
-                res.json({ success: true, pendingAdmins: rows });
-            });
+            const rows = await getMergedAdminsByStatus(accountTable, 'pending');
+            res.json({ success: true, pendingAdmins: rows });
         })().catch((error) => res.status(500).json({ success: false, error: error.message }));
     });
 
@@ -296,11 +323,18 @@ module.exports = (db) => {
     router.post('/api/approve-admin/:id', requireRole('superadmin'), (req, res) => {
         (async () => {
             const accountTable = await getAccountTable();
-            db.run(`UPDATE ${accountTable} SET status = 'active' WHERE id = ? AND role = 'admin'`, [req.params.id], function(err) {
-                if (err) return res.status(500).json({ success: false, error: err.message });
-                if (this.changes === 0) return res.status(404).json({ success: false, message: 'Admin not found or already active' });
-                res.json({ success: true, message: 'College Admin approved successfully' });
-            });
+            const id = Number(req.params.id);
+            if (!Number.isInteger(id) || id <= 0) {
+                return res.status(400).json({ success: false, message: 'Invalid admin id' });
+            }
+            const r1 = await dbRun(`UPDATE ${accountTable} SET status = 'active' WHERE id = ? AND LOWER(COALESCE(role, '')) = 'admin'`, [id]);
+            let totalChanges = Number(r1?.changes || 0);
+            if (accountTable !== 'faculty') {
+                const r2 = await dbRun(`UPDATE faculty SET status = 'active' WHERE id = ? AND LOWER(COALESCE(role, '')) = 'admin'`, [id]);
+                totalChanges += Number(r2?.changes || 0);
+            }
+            if (!totalChanges) return res.status(404).json({ success: false, message: 'Admin not found or already active' });
+            res.json({ success: true, message: 'College Admin approved successfully' });
         })().catch((error) => res.status(500).json({ success: false, error: error.message }));
     });
 
@@ -308,10 +342,18 @@ module.exports = (db) => {
     router.delete('/api/reject-admin/:id', requireRole('superadmin'), (req, res) => {
         (async () => {
             const accountTable = await getAccountTable();
-            db.run(`DELETE FROM ${accountTable} WHERE id = ? AND role = 'admin' AND status = 'pending'`, [req.params.id], function(err) {
-                if (err) return res.status(500).json({ success: false, error: err.message });
-                res.json({ success: true, message: 'College Admin registration rejected' });
-            });
+            const id = Number(req.params.id);
+            if (!Number.isInteger(id) || id <= 0) {
+                return res.status(400).json({ success: false, message: 'Invalid admin id' });
+            }
+            const r1 = await dbRun(`DELETE FROM ${accountTable} WHERE id = ? AND LOWER(COALESCE(role, '')) = 'admin' AND LOWER(COALESCE(status, '')) = 'pending'`, [id]);
+            let totalChanges = Number(r1?.changes || 0);
+            if (accountTable !== 'faculty') {
+                const r2 = await dbRun(`DELETE FROM faculty WHERE id = ? AND LOWER(COALESCE(role, '')) = 'admin' AND LOWER(COALESCE(status, '')) = 'pending'`, [id]);
+                totalChanges += Number(r2?.changes || 0);
+            }
+            if (!totalChanges) return res.status(404).json({ success: false, message: 'Pending admin not found' });
+            res.json({ success: true, message: 'College Admin registration rejected' });
         })().catch((error) => res.status(500).json({ success: false, error: error.message }));
     });
 

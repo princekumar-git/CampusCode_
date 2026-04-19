@@ -873,19 +873,27 @@ module.exports = (db) => {
                         COALESCE(NULLIF(au.post, ''), NULLIF(f.post, ''), UPPER(COALESCE(au.role, f.role, 'faculty'))) AS post,
                         COALESCE(NULLIF(au.department, ''), NULLIF(au.branch, ''), NULLIF(f.department, ''), NULLIF(f.branch, ''), '') AS department,
                         COALESCE(NULLIF(au.status, ''), NULLIF(f.status, ''), 'active') AS status,
-                        COALESCE(au.joiningDate, f.joiningDate, '') AS joiningDate,
+                        COALESCE(CAST(au.joiningDate AS TEXT), CAST(f.joiningDate AS TEXT), '') AS joiningDate,
                         (SELECT COUNT(*) FROM problems p WHERE p.faculty_id = sa.user_id) AS problems_created,
-                        GROUP_CONCAT(DISTINCT sa.subject) AS teaching_subjects
-                     FROM faculty_assignments sa
+                        (
+                          SELECT GROUP_CONCAT(DISTINCT sa2.subject)
+                          FROM faculty_assignments sa2
+                          WHERE sa2.user_id = sa.user_id
+                            AND LOWER(COALESCE(sa2.collegeName, '')) = LOWER(?)
+                        ) AS teaching_subjects
+                     FROM (
+                        SELECT DISTINCT user_id
+                        FROM faculty_assignments
+                        WHERE subject IN (${placeholders})
+                          AND LOWER(COALESCE(collegeName, '')) = LOWER(?)
+                          AND user_id <> ?
+                     ) sa
                      LEFT JOIN account_users au ON au.id = sa.user_id
                      LEFT JOIN faculty f ON f.id = sa.user_id
-                     WHERE sa.subject IN (${placeholders})
-                       AND LOWER(COALESCE(sa.collegeName, COALESCE(au.collegeName, f.collegeName, ''))) = LOWER(?)
-                       AND sa.user_id <> ?
+                     WHERE LOWER(COALESCE(au.collegeName, f.collegeName, '')) = LOWER(?)
                        AND LOWER(COALESCE(au.role, f.role, 'faculty')) IN ('faculty', 'hos')
-                     GROUP BY sa.user_id
-                     ORDER BY fullName COLLATE NOCASE ASC`,
-                    [...subjects, String(collegeName || '').toLowerCase(), hosId]
+                     ORDER BY LOWER(COALESCE(au.fullName, f.fullName, '')) ASC, sa.user_id ASC`,
+                    [String(collegeName || '').toLowerCase(), ...subjects, String(collegeName || '').toLowerCase(), hosId, String(collegeName || '').toLowerCase()]
                 ),
                 dbAll(
                     `SELECT subject, COUNT(DISTINCT section) as count
@@ -1820,11 +1828,11 @@ module.exports = (db) => {
                 hosDbGet(`SELECT COUNT(*) as total, SUM(CASE WHEN LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') THEN 1 ELSE 0 END) as accepted FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ?`, [...subjects, college]),
                 hosDbGet(`SELECT COUNT(DISTINCT s.user_id) as count FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.subject IN (${subPh}) AND u.collegeName = ?`, [...subjects, college]),
                 hosDbAll(`SELECT p.title, p.difficulty, COUNT(s.id) as submissions, SUM(CASE WHEN LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') THEN 1 ELSE 0 END) as accepted FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id LEFT JOIN submissions s ON s.problem_id = p.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? GROUP BY p.id ORDER BY submissions DESC LIMIT 5`, [...subjects, college]),
-                hosDbAll(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved, COALESCE(u.points, 0) as points FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id ORDER BY solved DESC LIMIT 5`, [...subjects, college]),
+                hosDbAll(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved, COALESCE(u.points, 0) as points FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id, u.fullName, u.year, u.section, u.points ORDER BY solved DESC LIMIT 5`, [...subjects, college]),
                 hosDbAll(`SELECT p.subject, COUNT(*) as count FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? GROUP BY p.subject ORDER BY count DESC`, [...subjects, college]),
-                hosDbAll(`SELECT title, status, COALESCE(startDate,'') as startDate, COALESCE(endDate,'') as endDate FROM contests WHERE subject IN (${subPh}) AND collegeName = ? ORDER BY createdAt DESC LIMIT 6`, [...subjects, college]),
+                hosDbAll(`SELECT title, status, COALESCE(CAST(startDate AS TEXT),'') as startDate, COALESCE(CAST(endDate AS TEXT),'') as endDate FROM contests WHERE subject IN (${subPh}) AND collegeName = ? ORDER BY createdAt DESC LIMIT 6`, [...subjects, college]),
                 hosDbAll(`SELECT strftime('%W', s.createdAt) as week, COUNT(*) as count FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND s.createdAt >= date('now', '-49 days') GROUP BY week ORDER BY week ASC`, [...subjects, college]),
-                hosDbAll(`SELECT u.fullName, COUNT(p.id) as contributions FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND p.status = 'accepted' GROUP BY u.id ORDER BY contributions DESC LIMIT 5`, [...subjects, college]),
+                hosDbAll(`SELECT u.fullName, COUNT(p.id) as contributions FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND p.status = 'accepted' GROUP BY u.id, u.fullName ORDER BY contributions DESC LIMIT 5`, [...subjects, college]),
                 hosDbAll(`SELECT u.year, u.section, AVG(s.points_earned) as avgPoints, COUNT(DISTINCT s.user_id) as studentCount FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON s.user_id = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY u.year, u.section ORDER BY u.year ASC, u.section ASC`, [...subjects, college]),
                 hosDbAll(`SELECT p.tags FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND p.status = 'accepted' AND p.tags IS NOT NULL AND p.tags != ''`, [...subjects, college])
             ]);
@@ -1880,7 +1888,11 @@ module.exports = (db) => {
             });
         } catch (error) {
             console.error("HOS Report Error:", error);
-            fs.writeFileSync(path.join(__dirname, '..', 'hos_report_error.txt'), error.stack || error.message);
+            const safeErrorText = error?.stack
+                || error?.message
+                || JSON.stringify(error, null, 2)
+                || 'Unknown HOS report error';
+            fs.writeFileSync(path.join(__dirname, '..', 'hos_report_error.txt'), safeErrorText);
             res.status(500).send("Internal Server Error during report generation.");
         }
     });
@@ -1919,8 +1931,8 @@ module.exports = (db) => {
                 hosDbGet(`SELECT COUNT(*) as total, SUM(CASE WHEN LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') THEN 1 ELSE 0 END) as accepted FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ?`, [...subjects, college]),
                 hosDbGet(`SELECT COUNT(DISTINCT s.user_id) as count FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.subject IN (${subPh}) AND u.collegeName = ?`, [...subjects, college]),
                 hosDbAll(`SELECT p.title, p.difficulty, COUNT(s.id) as submissions FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id LEFT JOIN submissions s ON s.problem_id = p.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? GROUP BY p.id ORDER BY submissions DESC LIMIT 5`, [...subjects, college]),
-                hosDbAll(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id ORDER BY solved DESC LIMIT 5`, [...subjects, college]),
-                hosDbAll(`SELECT u.fullName, COUNT(p.id) as contributions FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND p.status = 'accepted' GROUP BY u.id ORDER BY contributions DESC LIMIT 5`, [...subjects, college]),
+                hosDbAll(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id, u.fullName, u.year, u.section ORDER BY solved DESC LIMIT 5`, [...subjects, college]),
+                hosDbAll(`SELECT u.fullName, COUNT(p.id) as contributions FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND p.status = 'accepted' GROUP BY u.id, u.fullName ORDER BY contributions DESC LIMIT 5`, [...subjects, college]),
                 hosDbAll(`SELECT u.year, u.section, AVG(s.points_earned) as avgPoints FROM submissions s JOIN problems p ON s.problem_id = p.id JOIN account_users u ON s.user_id = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY u.year, u.section ORDER BY u.year ASC, u.section ASC`, [...subjects, college]),
                 hosDbAll(`SELECT p.tags FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.subject IN (${subPh}) AND u.collegeName = ? AND p.status = 'accepted' AND p.tags IS NOT NULL AND p.tags != ''`, [...subjects, college])
             ]);

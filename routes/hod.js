@@ -410,11 +410,14 @@ module.exports = (db, transporter) => {
                     COALESCE(s.language, 'N/A') as language,
                     COALESCE(s.status, 'pending') as status,
                     COALESCE(s.points_earned, 0) as pointsEarned,
-                    COALESCE(s.createdAt, '') as createdAt
+                    CASE
+                        WHEN TRIM(COALESCE(CAST(s.createdAt AS TEXT), '')) = '' THEN ''
+                        ELSE CAST(s.createdAt AS TEXT)
+                    END as createdAt
                 FROM submissions s
                 LEFT JOIN problems p ON p.id = s.problem_id
                 WHERE s.user_id = ?
-                ORDER BY datetime(COALESCE(s.createdAt, '1970-01-01')) DESC, s.id DESC
+                ORDER BY s.id DESC
                 LIMIT 5
             `, [studentId]);
 
@@ -464,11 +467,14 @@ module.exports = (db, transporter) => {
                     COALESCE(s.language, 'N/A') as language,
                     COALESCE(s.status, 'pending') as status,
                     COALESCE(s.points_earned, 0) as pointsEarned,
-                    COALESCE(s.createdAt, '') as createdAt
+                    CASE
+                        WHEN TRIM(COALESCE(CAST(s.createdAt AS TEXT), '')) = '' THEN ''
+                        ELSE CAST(s.createdAt AS TEXT)
+                    END as createdAt
                 FROM submissions s
                 LEFT JOIN problems p ON p.id = s.problem_id
                 WHERE s.user_id = ?
-                ORDER BY datetime(COALESCE(s.createdAt, '1970-01-01')) DESC, s.id DESC
+                ORDER BY s.id DESC
                 LIMIT 5
             `, [studentId]);
 
@@ -515,7 +521,7 @@ module.exports = (db, transporter) => {
                         p.id as itemId,
                         p.title as title,
                         COALESCE(NULLIF(p.status, ''), 'draft') as status,
-                        COALESCE(p.createdAt, '') as activityAt
+                        COALESCE(CAST(p.createdAt AS TEXT), '') as activityAt
                     FROM problems p
                     WHERE p.faculty_id = ?
 
@@ -526,7 +532,7 @@ module.exports = (db, transporter) => {
                         c.id as itemId,
                         c.title as title,
                         COALESCE(NULLIF(c.status, ''), 'draft') as status,
-                        COALESCE(c.createdAt, c.startDate, '') as activityAt
+                        COALESCE(CAST(c.createdAt AS TEXT), CAST(c.startDate AS TEXT), '') as activityAt
                     FROM contests c
                     WHERE c.createdBy = ?
                 )
@@ -613,7 +619,7 @@ module.exports = (db, transporter) => {
                         p.id as itemId,
                         p.title as title,
                         COALESCE(NULLIF(p.status, ''), 'draft') as status,
-                        COALESCE(p.createdAt, '') as activityAt
+                        COALESCE(CAST(p.createdAt AS TEXT), '') as activityAt
                     FROM problems p
                     WHERE p.faculty_id = ?
 
@@ -624,7 +630,7 @@ module.exports = (db, transporter) => {
                         c.id as itemId,
                         c.title as title,
                         COALESCE(NULLIF(c.status, ''), 'draft') as status,
-                        COALESCE(c.createdAt, c.startDate, '') as activityAt
+                        COALESCE(CAST(c.createdAt AS TEXT), CAST(c.startDate AS TEXT), '') as activityAt
                     FROM contests c
                     WHERE c.createdBy = ?
                 )
@@ -762,7 +768,7 @@ module.exports = (db, transporter) => {
                 SELECT
                     'problem' AS type,
                     p.title AS title,
-                    p.createdAt AS activityAt,
+                    CAST(p.createdAt AS TEXT) AS activityAt,
                     u.fullName AS author,
                     p.status AS status
                 FROM problems p
@@ -774,7 +780,7 @@ module.exports = (db, transporter) => {
                 SELECT
                     'contest' AS type,
                     c.title AS title,
-                    COALESCE(c.createdAt, c.startDate, c.date) AS activityAt,
+                    COALESCE(CAST(c.createdAt AS TEXT), CAST(c.startDate AS TEXT), CAST(c.date AS TEXT)) AS activityAt,
                     u.fullName AS author,
                     c.status AS status
                 FROM contests c
@@ -906,11 +912,13 @@ module.exports = (db, transporter) => {
                     u.mobile,
                     u.gender,
                     u.post,
-                    GROUP_CONCAT(DISTINCT ua.subject || ' (' || ua.year || ' - ' || ua.section || ')') as assignments
+                    (
+                        SELECT GROUP_CONCAT(DISTINCT fa.subject || ' (' || fa.year || ' - ' || fa.section || ')')
+                        FROM faculty_assignments fa
+                        WHERE fa.user_id = u.id
+                          AND ${normalizeSql(`COALESCE(fa.collegeName, '')`)} = ${normalizeSql(`?`)}
+                    ) as assignments
                 FROM account_users u
-                LEFT JOIN faculty_assignments ua
-                    ON u.id = ua.user_id
-                   AND ${normalizeSql(`COALESCE(ua.collegeName, '')`)} = ${normalizeSql(`?`)}
                 WHERE ${normalizeSql(`COALESCE(u.collegeName, '')`)} = ${normalizeSql(`?`)}
                   AND (
                       u.status = 'active'
@@ -926,7 +934,7 @@ module.exports = (db, transporter) => {
                 params.push(selectedDept);
             }
 
-            facultyQuery += ` GROUP BY u.id ORDER BY u.fullName COLLATE NOCASE ASC `;
+            facultyQuery += ` ORDER BY LOWER(COALESCE(u.fullName, '')) ASC, u.id ASC `;
 
             const faculty = await dbAll(facultyQuery, params);
             
@@ -1466,7 +1474,7 @@ module.exports = (db, transporter) => {
                      JOIN problems p ON p.id = s.problem_id
                      JOIN account_users u ON u.id = s.user_id
                      WHERE u.department = ? AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass')
-                     GROUP BY s.user_id ORDER BY solved DESC LIMIT 5`,
+                     GROUP BY s.user_id, u.fullName, u.year, u.section, u.points ORDER BY solved DESC LIMIT 5`,
                     [dept, college]
                 ),
                 // 8 - Subject-wise breakdown
@@ -1479,8 +1487,8 @@ module.exports = (db, transporter) => {
                 ),
                 // 9 - Recent contests
                 dbAll(
-                    `SELECT title, status, COALESCE(startDate,'') as startDate, COALESCE(endDate,'') as endDate
-                     FROM contests WHERE department = ? AND collegeName = ? ORDER BY createdAt DESC LIMIT 6`,
+            `SELECT title, status, COALESCE(CAST(startDate AS TEXT),'') as startDate, COALESCE(CAST(endDate AS TEXT),'') as endDate
+              FROM contests WHERE department = ? AND collegeName = ? ORDER BY createdAt DESC LIMIT 6`,
                     [dept, college]
                 ),
                 // 10 - Weekly submissions (past 7 weeks)
@@ -1499,7 +1507,7 @@ module.exports = (db, transporter) => {
                      FROM problems p
                      JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id
                      WHERE p.department = ? AND u.collegeName = ? AND p.status = 'accepted'
-                     GROUP BY u.id ORDER BY contributions DESC LIMIT 5`,
+                     GROUP BY u.id, u.fullName ORDER BY contributions DESC LIMIT 5`,
                     [dept, college]
                 ),
                 // 12 - Section-wise performance
@@ -1610,9 +1618,9 @@ module.exports = (db, transporter) => {
                 dbGet(`SELECT COUNT(DISTINCT s.user_id) as count FROM submissions s JOIN account_users u ON u.id = s.user_id WHERE u.department = ? AND u.collegeName = ?`, [dept, college]),
                 dbGet(`SELECT COUNT(*) as total, SUM(CASE WHEN LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') THEN 1 ELSE 0 END) as accepted FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.department = ? AND u.collegeName = ?`, [dept, college]),
                 dbAll(`SELECT p.title, p.difficulty, COUNT(s.id) as submissions, SUM(CASE WHEN LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') THEN 1 ELSE 0 END) as accepted FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id LEFT JOIN submissions s ON s.problem_id = p.id WHERE p.department = ? AND u.collegeName = ? GROUP BY p.id ORDER BY submissions DESC LIMIT 5`, [dept, college]),
-                dbAll(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved, COALESCE(u.points, 0) as points FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE u.department = ? AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id ORDER BY solved DESC LIMIT 5`, [dept, college]),
+                dbAll(`SELECT u.fullName, u.year, u.section, COUNT(DISTINCT s.problem_id) as solved, COALESCE(u.points, 0) as points FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON u.id = s.user_id WHERE u.department = ? AND u.collegeName = ? AND LOWER(COALESCE(s.status,'')) IN ('accepted','ac','pass') GROUP BY s.user_id, u.fullName, u.year, u.section, u.points ORDER BY solved DESC LIMIT 5`, [dept, college]),
                 dbAll(`SELECT COALESCE(NULLIF(p.subject,''),'Unassigned') as subject, COUNT(*) as count FROM problems p JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.department = ? AND u.collegeName = ? GROUP BY p.subject ORDER BY count DESC LIMIT 6`, [dept, college]),
-                dbAll(`SELECT title, status, COALESCE(startDate,'') as startDate, COALESCE(endDate,'') as endDate FROM contests WHERE department = ? AND collegeName = ? ORDER BY createdAt DESC LIMIT 6`, [dept, college]),
+            dbAll(`SELECT title, status, COALESCE(CAST(startDate AS TEXT),'') as startDate, COALESCE(CAST(endDate AS TEXT),'') as endDate FROM contests WHERE department = ? AND collegeName = ? ORDER BY createdAt DESC LIMIT 6`, [dept, college]),
                 dbAll(`SELECT strftime('%W', s.createdAt) as week, COUNT(*) as count FROM submissions s JOIN problems p ON p.id = s.problem_id JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id WHERE p.department = ? AND u.collegeName = ? AND s.createdAt >= date('now', '-49 days') GROUP BY week ORDER BY week ASC`, [dept, college]),
                 // 11 - Faculty leaderboard
                 dbAll(
@@ -1620,7 +1628,7 @@ module.exports = (db, transporter) => {
                      FROM problems p
                      JOIN account_users u ON COALESCE(p.faculty_id, p.created_by) = u.id
                      WHERE p.department = ? AND u.collegeName = ? AND p.status = 'accepted'
-                     GROUP BY u.id ORDER BY contributions DESC LIMIT 5`,
+                    GROUP BY u.id, u.fullName ORDER BY contributions DESC LIMIT 5`,
                     [dept, college]
                 ),
                 // 12 - Section-wise performance

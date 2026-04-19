@@ -81,6 +81,56 @@ module.exports = (db) => {
             .filter((id) => Number.isInteger(id) && id > 0);
     };
 
+    const dbRunAsync = (query, params = []) => new Promise((resolve, reject) => {
+        db.run(query, params, function (err) {
+            if (err) return reject(err);
+            resolve(this);
+        });
+    });
+
+    const awardXpAndSolvedCount = async ({ userId, pointsEarned, sessionUser }) => {
+        const role = String(sessionUser?.role || '').toLowerCase();
+        const email = String(sessionUser?.email || '').trim().toLowerCase();
+        const updates = [];
+
+        if (['student', 'individual'].includes(role)) {
+            updates.push(
+                dbRunAsync(
+                    `UPDATE student
+                     SET points = COALESCE(points, 0) + ?, solvedCount = COALESCE(solvedCount, 0) + 1
+                     WHERE id = ?`,
+                    [pointsEarned, userId]
+                )
+            );
+            if (email) {
+                updates.push(
+                    dbRunAsync(
+                        `UPDATE users
+                         SET points = COALESCE(points, 0) + ?, solvedCount = COALESCE(solvedCount, 0) + 1
+                         WHERE LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM(?))
+                           AND LOWER(COALESCE(role, '')) IN ('student', 'individual')`,
+                        [pointsEarned, email]
+                    )
+                );
+            }
+        } else {
+            updates.push(
+                dbRunAsync(
+                    `UPDATE account_users
+                     SET points = COALESCE(points, 0) + ?, solvedCount = COALESCE(solvedCount, 0) + 1
+                     WHERE id = ?`,
+                    [pointsEarned, userId]
+                )
+            );
+        }
+
+        const results = await Promise.allSettled(updates);
+        const hardFailures = results.filter((r) => r.status === 'rejected');
+        if (hardFailures.length && hardFailures.length === updates.length) {
+            throw hardFailures[0].reason;
+        }
+    };
+
     // ==========================================
     // FILE UPLOAD SETUP (Multer)
     // ==========================================
@@ -474,11 +524,17 @@ module.exports = (db) => {
 
         // Scan directory for input/output pairs
         const files = fs.readdirSync(tcDir);
-        const inputFiles = files.filter(f => f.startsWith('input') && f.endsWith('.txt'));
-        const pairs = inputFiles.map(f => {
-            const num = f.replace('input', '').replace('.txt', '');
-            return { input: f, output: `output${num}.txt` };
-        }).filter(p => files.includes(p.output));
+        const inputFiles = files.filter((f) => /^input(?:\d+)?\.txt$/i.test(f));
+        const pairs = inputFiles
+            .map((f) => {
+                const lower = String(f).toLowerCase();
+                if (lower === 'input.txt') {
+                    return { input: f, output: 'output.txt' };
+                }
+                const num = lower.replace('input', '').replace('.txt', '');
+                return { input: f, output: `output${num}.txt` };
+            })
+            .filter((p) => files.some((name) => String(name).toLowerCase() === String(p.output).toLowerCase()));
 
         // Store test case metadata in problem
         db.run(`UPDATE problems SET hidden_test_cases = ? WHERE id = ?`,
@@ -499,10 +555,17 @@ module.exports = (db) => {
             return res.json({ success: true, files: [], pairs: [] });
         }
         const files = fs.readdirSync(tcDir);
-        const inputFiles = files.filter(f => f.startsWith('input') && f.endsWith('.txt'));
-        const pairs = inputFiles.map(f => {
-            const num = f.replace('input', '').replace('.txt', '');
-            return { input: f, output: `output${num}.txt`, hasOutput: files.includes(`output${num}.txt`) };
+        const inputFiles = files.filter((f) => /^input(?:\d+)?\.txt$/i.test(f));
+        const pairs = inputFiles.map((f) => {
+            const lower = String(f).toLowerCase();
+            if (lower === 'input.txt') {
+                const hasOutput = files.some((name) => String(name).toLowerCase() === 'output.txt');
+                return { input: f, output: 'output.txt', hasOutput };
+            }
+            const num = lower.replace('input', '').replace('.txt', '');
+            const outputName = `output${num}.txt`;
+            const hasOutput = files.some((name) => String(name).toLowerCase() === outputName);
+            return { input: f, output: outputName, hasOutput };
         });
         res.json({ success: true, files, pairs });
     });
@@ -678,15 +741,25 @@ module.exports = (db) => {
             // Load hidden test case pairs
             const tcDir = path.join(__dirname, '..', 'public', 'uploads', 'testcases', String(problemId));
             let pairs = [];
+            let configuredHiddenPairs = [];
 
             try {
-                const storedPairs = problem.hidden_test_cases ? JSON.parse(problem.hidden_test_cases) : [];
-                pairs = storedPairs.filter(p => {
+                configuredHiddenPairs = problem.hidden_test_cases ? JSON.parse(problem.hidden_test_cases) : [];
+                if (!Array.isArray(configuredHiddenPairs)) configuredHiddenPairs = [];
+                pairs = configuredHiddenPairs.filter(p => {
                     return fs.existsSync(path.join(tcDir, p.input)) && fs.existsSync(path.join(tcDir, p.output));
                 });
             } catch (_) { }
 
-            // If no hidden test cases, fall back to sample
+            // If hidden testcases are configured but unavailable/corrupt, fail loudly.
+            // If no hidden testcases are configured, fall back to sample testcase.
+            if (configuredHiddenPairs.length > 0 && pairs.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Hidden test cases are configured but missing/invalid. Please re-upload test cases for this problem.'
+                });
+            }
+
             if (pairs.length === 0) {
                 if (problem.sample_input && problem.sample_output) {
                     pairs = [{ input: '__sample__', output: '__sample__' }];
@@ -751,11 +824,24 @@ module.exports = (db) => {
                     if (allPassed) {
                         db.get(`SELECT COUNT(*) as cnt FROM submissions WHERE problem_id = ? AND user_id = ? AND status = 'accepted' AND id != ?`,
                             [problemId, userId, this.lastID],
-                            (_, row) => {
-                                if (row && row.cnt === 0) {
-                                    // First time solving — award XP
-                                    db.run(`UPDATE account_users SET points = points + ?, solvedCount = solvedCount + 1 WHERE id = ?`,
-                                        [pointsEarned, userId]);
+                            (countErr, row) => {
+                                if (countErr) {
+                                    console.error('Accepted-count lookup error:', countErr.message);
+                                    return;
+                                }
+                                const acceptedBefore = Number(row?.cnt || 0);
+                                if (acceptedBefore === 0) {
+                                    // First-time solve only: award XP and solved count.
+                                    awardXpAndSolvedCount({ userId, pointsEarned, sessionUser: req.session?.user || {} })
+                                        .then(() => {
+                                            if (req.session?.user) {
+                                                req.session.user.points = Number(req.session.user.points || 0) + Number(pointsEarned || 0);
+                                                req.session.user.solvedCount = Number(req.session.user.solvedCount || 0) + 1;
+                                            }
+                                        })
+                                        .catch((xpErr) => {
+                                            console.error('XP update error:', xpErr?.message || xpErr);
+                                        });
                                 }
                             }
                         );
@@ -766,6 +852,7 @@ module.exports = (db) => {
                         status: finalStatus,
                         passed: results.filter(r => r.passed).length,
                         total: results.length,
+                        usedHiddenTestcases: !pairs.some((p) => p.input === '__sample__'),
                         pointsEarned,
                         results
                     });

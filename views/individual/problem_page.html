@@ -115,6 +115,9 @@
                 <button id="submissionsTabBtn" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
                     <i class="fas fa-history mr-1.5"></i> Submissions
                 </button>
+                <button id="notesTabBtn" class="px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                    <i class="fas fa-note-sticky mr-1.5"></i> Notes
+                </button>
             </div>
 
             <div id="descriptionPanel" class="flex-1 overflow-y-auto p-6 custom-scrollbar">
@@ -138,6 +141,70 @@
                 </div>
                 <div id="submissionsList" class="space-y-3">
                     <div class="text-sm text-gray-500 dark:text-gray-400">Loading submissions...</div>
+                </div>
+            </div>
+            <div id="notesPanel" class="hidden flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">Problem Notes</h2>
+                    <span id="notesSaveStatus" class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">Not saved</span>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Before Solving Plan</label>
+                        <textarea id="noteBeforePlan" class="w-full h-20 p-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200" placeholder="What is your plan before coding?"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Approach</label>
+                        <textarea id="noteApproach" class="w-full h-24 p-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200" placeholder="High-level idea and steps"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Edge Cases</label>
+                        <textarea id="noteEdgeCases" class="w-full h-20 p-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200" placeholder="List tricky input cases"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Complexity</label>
+                        <textarea id="noteComplexity" class="w-full h-16 p-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200" placeholder="Time/Space complexity"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Mistakes</label>
+                        <textarea id="noteMistakes" class="w-full h-20 p-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200" placeholder="What went wrong in failed attempts?"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Revision Note</label>
+                        <textarea id="noteRevision" class="w-full h-20 p-2 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200" placeholder="How would you solve this faster next time?"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Tags</label>
+                            <input id="noteTags" type="text" class="w-full h-10 px-3 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200" placeholder="dp, graph, binary-search" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase">Revision Bucket</label>
+                            <select id="noteReviseBucket" class="w-full h-10 px-3 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+                                <option value="">No reminder</option>
+                                <option value="3d">Revise in 3 days</option>
+                                <option value="1w">Revise in 1 week</option>
+                            </select>
+                        </div>
+                    </div>
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input id="notePinned" type="checkbox" class="rounded border-gray-300 dark:border-gray-600">
+                        Pin this note insight
+                    </label>
+
+                    <div class="flex items-center gap-2 pt-2">
+                        <button id="saveNotesBtn" class="px-4 py-2 rounded bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium">Save Notes</button>
+                        <button id="downloadNotesBtn" class="px-4 py-2 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 text-sm font-medium">Download Notes</button>
+                        <span class="text-xs text-gray-500 dark:text-gray-400">Auto-save enabled</span>
+                    </div>
+
+                    <div class="pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Solved Notes History</h3>
+                        <div id="notesHistoryList" class="space-y-2">
+                            <div class="text-xs text-gray-500 dark:text-gray-400">No solved entries yet.</div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -215,6 +282,11 @@
 
     <div id="successModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm hidden">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-sm w-full text-center transform scale-95 transition-transform duration-300">
+            <div class="flex justify-end -mt-2 -mr-2 mb-1">
+                <button id="closeSuccessModalBtn" class="h-8 w-8 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="Close success modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
             <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i class="fas fa-check text-3xl text-green-500"></i>
             </div>
@@ -279,6 +351,11 @@
             cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint main() {\n    ios::sync_with_stdio(false);\n    cin.tie(nullptr);\n    // write your logic\n    return 0;\n}\n`,
             java: `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        // write your logic\n    }\n}\n`,
             c: `#include <stdio.h>\n\nint main() {\n    // write your logic\n    return 0;\n}\n`
+        };
+        const notesState = {
+            saveTimer: null,
+            isLoaded: false,
+            lastSavedJson: ''
         };
 
         const getProblemId = () => {
@@ -434,6 +511,196 @@
             await loadSubmissionCount();
             await loadSubmissions();
             await loadInteractions();
+            await loadProblemNotes();
+        }
+
+        function getNotePayload() {
+            return {
+                beforePlan: document.getElementById('noteBeforePlan')?.value || '',
+                approach: document.getElementById('noteApproach')?.value || '',
+                edgeCases: document.getElementById('noteEdgeCases')?.value || '',
+                complexity: document.getElementById('noteComplexity')?.value || '',
+                mistakes: document.getElementById('noteMistakes')?.value || '',
+                revision: document.getElementById('noteRevision')?.value || '',
+                tags: document.getElementById('noteTags')?.value || '',
+                reviseBucket: document.getElementById('noteReviseBucket')?.value || '',
+                isPinned: Boolean(document.getElementById('notePinned')?.checked)
+            };
+        }
+
+        function setNotesStatus(text, style = 'idle') {
+            const el = document.getElementById('notesSaveStatus');
+            if (!el) return;
+            el.textContent = text;
+            if (style === 'saved') {
+                el.className = 'text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300';
+                return;
+            }
+            if (style === 'saving') {
+                el.className = 'text-xs px-2 py-1 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300';
+                return;
+            }
+            if (style === 'error') {
+                el.className = 'text-xs px-2 py-1 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300';
+                return;
+            }
+            el.className = 'text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
+        }
+
+        function formatEntryTime(value) {
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return 'N/A';
+            return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function renderNotesHistory(entries) {
+            const list = document.getElementById('notesHistoryList');
+            if (!list) return;
+            const rows = Array.isArray(entries) ? entries : [];
+            if (!rows.length) {
+                list.innerHTML = '<div class="text-xs text-gray-500 dark:text-gray-400">No solved entries yet.</div>';
+                return;
+            }
+            list.innerHTML = rows.map((e, idx) => `
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-semibold text-gray-700 dark:text-gray-200">#${idx + 1} ${esc(String(e.status || '').toUpperCase() || 'SOLVED')}</span>
+                        <span class="text-[11px] text-gray-500 dark:text-gray-400">${esc(formatEntryTime(e.createdAt))}</span>
+                    </div>
+                    <div class="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                        <span><b>Method used:</b> ${esc(e.used_method || 'Not detected')}</span>
+                        <span class="mx-1">|</span>
+                        <span><b>Best method:</b> ${esc(e.best_method || 'N/A')}</span>
+                    </div>
+                    <div class="mt-1 text-xs text-gray-600 dark:text-gray-300">
+                        <span><b>Language:</b> ${esc((e.language || '').toUpperCase() || 'N/A')}</span>
+                        <span class="mx-1">|</span>
+                        <span><b>Cases:</b> ${Number(e.passed_count || 0)}/${Number(e.total_count || 0)}</span>
+                    </div>
+                    ${e.previous_approach ? `<div class="mt-1 text-xs text-gray-600 dark:text-gray-300"><b>Previous approach:</b> ${esc(e.previous_approach)}</div>` : ''}
+                    ${e.approach_snapshot ? `<div class="mt-1 text-xs text-gray-600 dark:text-gray-300"><b>Snapshot:</b> ${esc(e.approach_snapshot)}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function saveProblemNotes(force = false) {
+            if (!currentProblemId || !notesState.isLoaded) return;
+            const payload = getNotePayload();
+            const nextJson = JSON.stringify(payload);
+            if (!force && nextJson === notesState.lastSavedJson) return;
+            setNotesStatus('Saving...', 'saving');
+            try {
+                const res = await fetch(`/individual/api/problem-notes/${currentProblemId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) throw new Error(data.error || data.message || 'Save failed');
+                notesState.lastSavedJson = nextJson;
+                setNotesStatus('Saved', 'saved');
+            } catch (_) {
+                setNotesStatus('Save failed', 'error');
+            }
+        }
+
+        function queueNotesAutosave() {
+            if (!notesState.isLoaded) return;
+            setNotesStatus('Unsaved', 'idle');
+            if (notesState.saveTimer) clearTimeout(notesState.saveTimer);
+            notesState.saveTimer = setTimeout(() => saveProblemNotes(false), 1200);
+        }
+
+        function bindNotesInputs() {
+            const ids = ['noteBeforePlan', 'noteApproach', 'noteEdgeCases', 'noteComplexity', 'noteMistakes', 'noteRevision', 'noteTags', 'noteReviseBucket', 'notePinned'];
+            ids.forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const evt = (id === 'noteReviseBucket' || id === 'notePinned') ? 'change' : 'input';
+                el.addEventListener(evt, queueNotesAutosave);
+            });
+            const saveBtn = document.getElementById('saveNotesBtn');
+            if (saveBtn) {
+                saveBtn.addEventListener('click', () => saveProblemNotes(true));
+            }
+            const downloadBtn = document.getElementById('downloadNotesBtn');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', () => {
+                    if (!currentProblemId) return;
+                    window.location.href = `/individual/api/problem-notes/${currentProblemId}/download`;
+                });
+            }
+        }
+
+        function detectMethodFromCode(code) {
+            const src = String(code || '').toLowerCase();
+            if (!src.trim()) return 'Not detected';
+            if (src.includes('heapq') || src.includes('priority_queue')) return 'Heap / Priority Queue';
+            if (src.includes('deque') || src.includes('queue<')) return 'Queue / BFS';
+            if (src.includes('dfs') || src.includes('stack<') || src.includes('def dfs') || src.includes('recursion')) return 'DFS / Recursion';
+            if (src.includes('binary_search') || src.includes('mid =') || src.includes('while (l <= r')) return 'Binary Search';
+            if (src.includes('dp[') || src.includes('memo') || src.includes('tabulation')) return 'Dynamic Programming';
+            if (src.includes('left') && src.includes('right') && src.includes('while')) return 'Two Pointers / Sliding Window';
+            if (src.includes('sort(') || src.includes('.sort(') || src.includes('sorted(')) return 'Sorting-based';
+            if (src.includes('unordered_map') || src.includes('hashmap') || src.includes('dict(')) return 'Hashing / Map';
+            return 'Brute Force / Custom Logic';
+        }
+
+        async function logSolvedNoteEntry(submitData) {
+            if (!currentProblemId) return;
+            const status = String(submitData?.status || '').toLowerCase();
+            if (!['accepted', 'ac', 'pass'].includes(status)) return;
+            const note = getNotePayload();
+            const currentCode = document.getElementById('codeEditor')?.value || '';
+            const usedMethod = detectMethodFromCode(currentCode);
+            const previousApproach = JSON.parse(notesState.lastSavedJson || '{}')?.approach || '';
+            try {
+                const res = await fetch(`/individual/api/problem-notes/${currentProblemId}/solve-entry`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        status,
+                        language: document.getElementById('languageSelect')?.value || '',
+                        passedCount: Number(submitData?.passed || 0),
+                        totalCount: Number(submitData?.total || 0),
+                        approachSnapshot: note.approach,
+                        previousApproach,
+                        code: currentCode,
+                        usedMethod
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) return;
+                await loadProblemNotes();
+            } catch (_) {}
+        }
+
+        async function loadProblemNotes() {
+            if (!currentProblemId) return;
+            try {
+                const res = await fetch(`/individual/api/problem-notes/${currentProblemId}`);
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success || !data.note) throw new Error('Failed');
+                const n = data.note;
+                document.getElementById('noteBeforePlan').value = n.before_plan || '';
+                document.getElementById('noteApproach').value = n.approach || '';
+                document.getElementById('noteEdgeCases').value = n.edge_cases || '';
+                document.getElementById('noteComplexity').value = n.complexity || '';
+                document.getElementById('noteMistakes').value = n.mistakes || '';
+                document.getElementById('noteRevision').value = n.revision || '';
+                document.getElementById('noteTags').value = n.tags || '';
+                document.getElementById('noteReviseBucket').value = n.revise_bucket || '';
+                document.getElementById('notePinned').checked = Number(n.is_pinned || 0) === 1;
+                notesState.isLoaded = true;
+                notesState.lastSavedJson = JSON.stringify(getNotePayload());
+                setNotesStatus(n.updatedAt ? 'Saved' : 'Not saved', n.updatedAt ? 'saved' : 'idle');
+                renderNotesHistory(data.entries || []);
+            } catch (_) {
+                notesState.isLoaded = true;
+                notesState.lastSavedJson = JSON.stringify(getNotePayload());
+                setNotesStatus('Not saved', 'idle');
+                renderNotesHistory([]);
+            }
         }
 
         function formatSubmissionStatus(status) {
@@ -600,6 +867,8 @@
                 });
                 const data = await res.json().catch(() => ({}));
                 if (data.success && data.status === 'accepted') {
+                    await saveProblemNotes(true);
+                    await logSolvedNoteEntry(data);
                     document.getElementById('successModal').classList.remove('hidden');
                     const out = document.getElementById('outputBox');
                     out.className = 'bg-white dark:bg-gray-900 p-2 rounded border border-gray-200 dark:border-gray-700 text-green-600 dark:text-green-400';
@@ -629,19 +898,27 @@
         function bindTabs() {
             const descriptionTabBtn = document.getElementById('descriptionTabBtn');
             const submissionsTabBtn = document.getElementById('submissionsTabBtn');
+            const notesTabBtn = document.getElementById('notesTabBtn');
             const descriptionPanel = document.getElementById('descriptionPanel');
             const submissionsPanel = document.getElementById('submissionsPanel');
+            const notesPanel = document.getElementById('notesPanel');
             const refreshSubmissionsBtn = document.getElementById('refreshSubmissionsBtn');
-            if (!descriptionTabBtn || !submissionsTabBtn || !descriptionPanel || !submissionsPanel) return;
+            if (!descriptionTabBtn || !submissionsTabBtn || !notesTabBtn || !descriptionPanel || !submissionsPanel || !notesPanel) return;
 
             const setActiveTab = (key) => {
                 const descActive = key === 'description';
+                const subActive = key === 'submissions';
+                const notesActive = key === 'notes';
                 descriptionPanel.classList.toggle('hidden', !descActive);
-                submissionsPanel.classList.toggle('hidden', descActive);
+                submissionsPanel.classList.toggle('hidden', !subActive);
+                notesPanel.classList.toggle('hidden', !notesActive);
                 descriptionTabBtn.className = descActive
                     ? 'px-4 py-2 text-sm font-medium text-primary-600 dark:text-blue-400 border-b-2 border-primary-600 dark:border-blue-400 bg-white dark:bg-gray-900'
                     : 'px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200';
-                submissionsTabBtn.className = !descActive
+                submissionsTabBtn.className = subActive
+                    ? 'px-4 py-2 text-sm font-medium text-primary-600 dark:text-blue-400 border-b-2 border-primary-600 dark:border-blue-400 bg-white dark:bg-gray-900'
+                    : 'px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200';
+                notesTabBtn.className = notesActive
                     ? 'px-4 py-2 text-sm font-medium text-primary-600 dark:text-blue-400 border-b-2 border-primary-600 dark:border-blue-400 bg-white dark:bg-gray-900'
                     : 'px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200';
             };
@@ -651,6 +928,7 @@
                 setActiveTab('submissions');
                 await loadSubmissions();
             });
+            notesTabBtn.addEventListener('click', () => setActiveTab('notes'));
             if (refreshSubmissionsBtn) refreshSubmissionsBtn.addEventListener('click', loadSubmissions);
         }
 
@@ -694,10 +972,19 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             bindTabs();
+            bindNotesInputs();
             bindProfileOverlay();
             loadProfileMini();
             const submitTop = document.getElementById('submitBtnTop');
             if (submitTop) submitTop.addEventListener('click', submitCode);
+            const successModal = document.getElementById('successModal');
+            const closeSuccessModalBtn = document.getElementById('closeSuccessModalBtn');
+            if (closeSuccessModalBtn && successModal) {
+                closeSuccessModalBtn.addEventListener('click', () => successModal.classList.add('hidden'));
+                successModal.addEventListener('click', (e) => {
+                    if (e.target === successModal) successModal.classList.add('hidden');
+                });
+            }
             const bookmarkBtnTop = document.getElementById('bookmarkBtnTop');
             if (bookmarkBtnTop) bookmarkBtnTop.addEventListener('click', toggleBookmark);
             const likeBtn = document.getElementById('likeBtn');

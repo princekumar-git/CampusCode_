@@ -136,7 +136,9 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
         const contestDepartment = String(contestRow?.department || '').trim();
         const scope = String(contestRow?.visibility_scope || contestRow?.scope || contestRow?.level || '').toLowerCase();
 
-        if (creatorRole === 'superadmin') return true;
+        // Platform-level contests are visible to all students regardless of creator college.
+        if (scope === 'global') return true;
+        if (creatorRole === 'superadmin' || creatorRole === 'admin') return true;
         if (!studentCollegeNorm || !creatorCollegeNorm || creatorCollegeNorm !== studentCollegeNorm) return false;
 
         if (scope === 'global') return true;
@@ -265,7 +267,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
 
         const rows = await dbAll(`
             WITH solved_distinct AS (
-                SELECT
+                SELECT DISTINCT
                     s.user_id,
                     s.problem_id,
                     LOWER(COALESCE(NULLIF(p.scope, ''), NULLIF(p.visibility_scope, ''),
@@ -279,16 +281,15 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
                 JOIN problems p ON p.id = s.problem_id
                 LEFT JOIN account_users creator ON creator.id = COALESCE(p.created_by, p.faculty_id)
                 WHERE s.status = 'accepted'
-                GROUP BY s.user_id, s.problem_id
             )
             SELECT
                 sd.user_id,
                 SUM(
                     CASE
-                        WHEN sd.scope_norm = 'global' THEN ?
+                        WHEN sd.scope_norm = 'global' THEN CAST(? AS DOUBLE PRECISION)
                         WHEN sd.scope_norm IN ('college', 'department', 'internal')
-                             AND sd.creator_college = LOWER(?) THEN 1
-                        ELSE 0
+                             AND sd.creator_college = LOWER(?) THEN 1.0
+                        ELSE 0.0
                     END
                 ) AS weighted_score
             FROM solved_distinct sd
@@ -394,16 +395,44 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
         };
     };
 
+    const parseDbDate = (value) => {
+        if (!value) return null;
+        if (value instanceof Date) return value;
+        const raw = String(value).trim();
+        if (!raw) return null;
+        // Treat plain "YYYY-MM-DD HH:mm:ss" as local server/app timestamp to avoid UTC drift.
+        if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) {
+            const localIsoLike = raw.replace(' ', 'T');
+            const dt = new Date(localIsoLike);
+            return Number.isNaN(dt.getTime()) ? null : dt;
+        }
+        const dt = new Date(raw);
+        return Number.isNaN(dt.getTime()) ? null : dt;
+    };
+
+    const toLocalDateKey = (value) => {
+        const dt = parseDbDate(value);
+        if (!dt) return null;
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
     const getTimeAgo = (dateValue) => {
-        const timestamp = new Date(dateValue).getTime();
+        const dt = parseDbDate(dateValue);
+        if (!dt) return 'Recently';
+        const timestamp = dt.getTime();
         if (Number.isNaN(timestamp)) return 'Recently';
         const diffMs = Date.now() - timestamp;
+        const diffMinutes = Math.floor(diffMs / (1000 * 60));
         const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
         const diffDays = Math.floor(diffHours / 24);
-        if (diffHours < 1) return 'Just now';
+        if (diffMinutes < 1) return 'Just now';
+        if (diffMinutes < 60) return `${diffMinutes}m ago`;
         if (diffHours < 24) return `${diffHours}h ago`;
         if (diffDays < 30) return `${diffDays}d ago`;
-        return new Date(dateValue).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
     // ==========================================
@@ -412,6 +441,7 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
     router.get('/dashboard', requireRole('student'), async (req, res) => {
         const sessionUser = req.session.user;
         const userId = sessionUser.id;
+        const toIsoDateKey = (value) => toLocalDateKey(value);
         try {
             const [userRow, solvedDifficultyCounts] = await Promise.all([
                 dbGet(`SELECT points, solvedCount, rank, year, section, branch, program, fullName, email FROM account_users WHERE id = ?`, [userId]),
@@ -453,16 +483,22 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
                     SELECT s.createdAt, p.title, p.difficulty
                     FROM submissions s
                     JOIN problems p ON p.id = s.problem_id
-                    WHERE s.user_id = ? AND s.status = 'accepted'
+                    WHERE s.user_id = ?
+                      AND LOWER(COALESCE(s.status, '')) IN ('accepted', 'ac', 'pass')
                     ORDER BY s.createdAt DESC
                 `, [userId]),
                 dbGet(`SELECT COUNT(*) as cnt FROM account_users WHERE LOWER(role) = 'student'`, [])
             ]);
 
             const latestAccepted = acceptedRows[0];
-            displayUser.last_solved_time = latestAccepted
-                ? `Last solved ${new Date(latestAccepted.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-                : 'No recent activity';
+            if (latestAccepted) {
+                const solvedAt = new Date(latestAccepted.createdAt);
+                displayUser.last_solved_time = Number.isNaN(solvedAt.getTime())
+                    ? 'No recent activity'
+                    : `Last solved ${solvedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+            } else {
+                displayUser.last_solved_time = 'No recent activity';
+            }
             displayUser.next_level_xp = getClassProgressMeta(displayUser.xp).xpToNextClass;
 
             const stats = {
@@ -480,15 +516,16 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
                 date.setHours(0, 0, 0, 0);
                 date.setDate(date.getDate() - i);
                 last7Days.push({
-                    key: date.toISOString().slice(0, 10),
+                    key: toLocalDateKey(date),
                     label: date.toLocaleDateString('en-US', { weekday: 'short' })
                 });
             }
 
             const activityMap = new Map(last7Days.map(day => [day.key, 0]));
             submissionRows.forEach(row => {
-                if (row.status !== 'accepted') return;
-                const key = new Date(row.createdAt).toISOString().slice(0, 10);
+                if (!['accepted', 'ac', 'pass'].includes(String(row.status || '').toLowerCase())) return;
+                const key = toIsoDateKey(row.createdAt);
+                if (!key) return;
                 if (activityMap.has(key)) {
                     activityMap.set(key, activityMap.get(key) + 1);
                 }
@@ -500,13 +537,14 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
                 date.setHours(0, 0, 0, 0);
                 date.setDate(date.getDate() - i);
                 heatmapDates.push({
-                    key: date.toISOString().slice(0, 10),
+                    key: toLocalDateKey(date),
                     label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                 });
             }
             const heatmapMap = new Map(heatmapDates.map(day => [day.key, 0]));
             acceptedRows.forEach(row => {
-                const key = new Date(row.createdAt).toISOString().slice(0, 10);
+                const key = toIsoDateKey(row.createdAt);
+                if (!key) return;
                 if (heatmapMap.has(key)) {
                     heatmapMap.set(key, heatmapMap.get(key) + 1);
                 }
@@ -823,6 +861,11 @@ const GLOBAL_SOLVE_WEIGHT_FOR_COLLEGE_RANK = 0.3;
 
     router.get('/thread', requireRole('student'), (req, res) => {
         res.sendFile(path.join(__dirname, '../views/student/thread.html'));
+    });
+
+    router.get('/forum/thread', requireRole('student'), (req, res) => {
+        const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+        return res.redirect(`/student/thread${query}`);
     });
 
     router.get('/thread.html', requireRole('student'), (req, res) => res.redirect('/student/thread'));

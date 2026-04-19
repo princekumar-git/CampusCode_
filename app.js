@@ -10,8 +10,8 @@ const session = require('express-session');
 const ejs = require('ejs');
 const { requireRole } = require('./middleware/auth');
 
-// Import the modularized database connection
-const db = require('./database'); 
+// Import env-driven database connection (SQLite/PostgreSQL)
+const db = require('./db'); 
 
 const app = express();
 const PORT = process.env.PORT || 3000;

@@ -507,7 +507,7 @@ module.exports = (db, transporter) => {
             SELECT strftime('%m', createdAt) as month_num, COUNT(*) as count
             FROM users 
             WHERE collegeName = ? AND createdAt >= date('now', '-6 months')
-            GROUP BY month_num ORDER BY createdAt ASC
+            GROUP BY month_num ORDER BY month_num ASC
         `;
 
         db.all(query, [collegeName], (err, rows) => {
@@ -1997,21 +1997,29 @@ router.put('/api/contests/:id', requireRole('admin'), (req, res) => {
                     COALESCE(s.language, 'N/A') as language,
                     COALESCE(s.status, 'pending') as status,
                     COALESCE(s.points_earned, 0) as pointsEarned,
-                    COALESCE(s.createdAt, '') as createdAt
+                    CASE
+                        WHEN TRIM(COALESCE(CAST(s.createdAt AS TEXT), '')) = '' THEN ''
+                        ELSE CAST(s.createdAt AS TEXT)
+                    END as createdAt
                  FROM submissions s
                  LEFT JOIN problems p ON p.id = s.problem_id
                  WHERE s.user_id = ?
-                 ORDER BY datetime(COALESCE(s.createdAt, '1970-01-01')) DESC, s.id DESC
+                 ORDER BY s.id DESC
                  LIMIT 5`,
                 [studentId]
             );
 
             const acceptedDays = await dbAllAsync(
-                `SELECT DATE(COALESCE(createdAt, CURRENT_TIMESTAMP)) AS submitted_on
+                `SELECT
+                    CASE
+                        WHEN TRIM(COALESCE(CAST(createdAt AS TEXT), '')) ~ '^\\d{4}-\\d{2}-\\d{2}'
+                            THEN DATE(CAST(createdAt AS TIMESTAMP))
+                        ELSE CURRENT_DATE
+                    END AS submitted_on
                  FROM submissions
                  WHERE user_id = ?
                    AND LOWER(COALESCE(status, '')) IN ('accepted', 'ac', 'pass')
-                 GROUP BY DATE(COALESCE(createdAt, CURRENT_TIMESTAMP))
+                 GROUP BY 1
                  ORDER BY submitted_on DESC`,
                 [studentId]
             );
