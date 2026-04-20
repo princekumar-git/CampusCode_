@@ -851,6 +851,37 @@
             return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
         }
 
+        function isTruthyOne(value) {
+            return value === 1 || value === true || String(value).trim() === '1';
+        }
+
+        function encodeRequestMeta(request) {
+            return encodeURIComponent(JSON.stringify({
+                id: request.id,
+                source_table: request.source_table || 'users',
+                role: request.role || '',
+                request_type: request.request_type || 'account'
+            }));
+        }
+
+        function decodeRequestMeta(rawValue) {
+            try {
+                return JSON.parse(decodeURIComponent(String(rawValue || '')));
+            } catch (_) {
+                return null;
+            }
+        }
+
+        function goToFacultyProfile(id) {
+            if (!id) return;
+            window.location.href = `/college/view_faculty?id=${encodeURIComponent(id)}`;
+        }
+
+        function goToStudentProfile(id) {
+            if (!id) return;
+            window.location.href = `/college/view_student?id=${encodeURIComponent(id)}`;
+        }
+
         function normalizeYearValue(value) {
             const raw = String(value || '').trim();
             if (!raw) return '';
@@ -992,7 +1023,7 @@
                         role: u.role,
                         type: (u.role && u.role.toLowerCase() === 'student') ? 'student' : 'faculty',
                         branch: u.branch || '',
-                        is_hod: u.is_hod || 0,
+                        is_hod: isTruthyOne(u.is_hod) ? 1 : 0,
                         status: u.status || 'Active',
                         last_active: u.last_active || 'N/A',
                         program: u.program || '',
@@ -1021,7 +1052,11 @@
                 const resReq = await fetch('/college/api/pending-faculty');
                 if (resReq.ok) {
                     const rData = await resReq.json();
-                    requests = rData.pending || [];
+                    requests = (rData.pending || []).map((reqItem) => ({
+                        ...reqItem,
+                        type: 'requests',
+                        request_type: reqItem.request_type || 'account'
+                    }));
                 }
 
                 const pendingCount = requests.length;
@@ -1173,8 +1208,8 @@
                         (u.email && u.email.toLowerCase().includes(searchVal)) ||
                         (u.id && u.id.toString().toLowerCase().includes(searchVal));
                 }
-                if (progFilterVal && u.type !== 'requests') matchesProg = u.program === progFilterVal;
-                if (branchFilterVal && u.type !== 'requests') matchesBranch = u.branch === branchFilterVal;
+                if (progFilterVal && activeTab !== 'requests') matchesProg = u.program === progFilterVal;
+                if (branchFilterVal && activeTab !== 'requests') matchesBranch = u.branch === branchFilterVal;
 
                 return matchesSearch && matchesProg && matchesBranch;
             });
@@ -1197,7 +1232,7 @@
                     tr.innerHTML = `
                 <td class="p-4"><input type="checkbox" class="user-checkbox rounded border-gray-300 text-primary-500 focus:ring-primary-500 cursor-pointer" value="${u.id}" onchange="toggleBulkActionBtn()"></td>
                 <td class="p-4">
-                    <div class="flex items-center gap-3 cursor-pointer group" onclick="window.location.href='/college/view_student?id=${u.id}'" title="View Profile">
+                        <div class="flex items-center gap-3 cursor-pointer group" onclick="goToStudentProfile(${u.id})" title="View Profile">
                         <div class="h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-blue-200 transition-colors">${initial}</div>
                         <div>
                             <p class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-500 transition-colors">${u.fullName}</p>
@@ -1224,7 +1259,7 @@
                 </td>
             `;
                 } else if (activeTab === 'faculty') {
-                    const isHod = u.is_hod === 1;
+                    const isHod = isTruthyOne(u.is_hod);
                     const isHos = String(u.role || '').toLowerCase() === 'hos';
 
                     let roleBadge = `<span class="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 text-[10px] font-bold px-2 py-1 rounded-md">Faculty</span>`;
@@ -1237,7 +1272,7 @@
                     tr.innerHTML = `
                 <td class="p-4"><input type="checkbox" class="user-checkbox rounded border-gray-300 text-primary-500 focus:ring-primary-500 cursor-pointer" value="${u.id}" onchange="toggleBulkActionBtn()"></td>
                 <td class="p-4">
-                    <div class="flex items-center gap-3 cursor-pointer group" onclick="window.location.href='/college/view_faculty?id=${u.id}'" title="View Profile">
+                        <div class="flex items-center gap-3 cursor-pointer group" onclick="goToFacultyProfile(${u.id})" title="View Profile">
                         <div class="h-8 w-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-green-200 transition-colors">${initial}</div>
                         <div>
                             <p class="text-sm font-bold text-gray-900 dark:text-white group-hover:text-primary-500 transition-colors">${u.fullName}</p>
@@ -1258,27 +1293,31 @@
                 <td class="p-4 text-center"><span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-md">${u.status}</span></td>
                 <td class="p-4 text-center text-[10px] text-gray-500">${u.last_active}</td>
                 <td class="p-4 text-center">
-                    <button onclick="toggleHOD(${u.id}, ${u.is_hod})" class="text-purple-500 hover:text-purple-700 mr-2" title="${u.is_hod ? 'Remove HOD' : 'Make HOD'}"><i class="fas fa-user-tie"></i></button>
+                    <button onclick="toggleHOD(${u.id}, ${isHod ? 1 : 0})" class="text-purple-500 hover:text-purple-700 mr-2" title="${isHod ? 'Remove HOD' : 'Make HOD'}"><i class="fas fa-user-tie"></i></button>
                     <button onclick="openEditModal(${u.id})" class="text-blue-500 hover:text-blue-700 mr-2"><i class="fas fa-pen"></i></button>
                     <button onclick="deleteUser(${u.id}, 'faculty')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
                 </td>
             `;
                 } else {
+                    const requestMeta = encodeRequestMeta(u);
+                    const roleLabel = String(u.role || '').trim() || 'user';
                     tr.innerHTML = `
-                <td class="p-4"><input type="checkbox" class="user-checkbox rounded border-gray-300 text-primary-500 focus:ring-primary-500 cursor-pointer" value="${u.id}" onchange="toggleBulkActionBtn()"></td>
+                <td class="p-4"><input type="checkbox" class="user-checkbox rounded border-gray-300 text-primary-500 focus:ring-primary-500 cursor-pointer" value="${requestMeta}" onchange="toggleBulkActionBtn()"></td>
                 <td class="p-4">
                     <div class="flex items-center gap-3">
                         <div class="h-8 w-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold text-xs shrink-0">${initial}</div>
                         <div>
                             <p class="text-sm font-bold text-gray-900 dark:text-white">${u.fullName}</p>
                             <p class="text-[10px] text-gray-500">${u.email}</p>
+                            <p class="text-[10px] text-gray-400 uppercase tracking-wide">${u.request_type === 'college_change' ? 'College Change Request' : 'Account Verification Request'}</p>
+                            <p class="text-[10px] text-primary-600 uppercase tracking-wide font-semibold">${roleLabel}</p>
                         </div>
                     </div>
                 </td>
                 <td class="p-4">
                     <div class="flex gap-2 items-center justify-center m-0 flex-wrap">
-                        <button type="button" onclick="verifyRequest(${u.id})" class="bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-600">Verify</button>
-                        <button type="button" onclick="handleRequest(${u.id}, 'reject')" class="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">Reject</button>
+                        <button type="button" onclick="verifyRequest('${requestMeta}')" class="bg-green-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-600">Verify</button>
+                        <button type="button" onclick="handleRequest('${requestMeta}', 'reject')" class="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">Reject</button>
                     </div>
                 </td>
             `;
@@ -1545,16 +1584,18 @@
 
         async function bulkVerify() {
             const checkboxes = document.querySelectorAll('.user-checkbox:checked');
-            const userIds = Array.from(checkboxes).map(cb => cb.value);
+            const requestsToVerify = Array.from(checkboxes)
+                .map(cb => decodeRequestMeta(cb.value))
+                .filter(Boolean);
 
-            if (userIds.length === 0) return;
-            if (!confirm(`Are you sure you want to verify ${userIds.length} selected users?`)) return;
+            if (requestsToVerify.length === 0) return;
+            if (!confirm(`Are you sure you want to verify ${requestsToVerify.length} selected users?`)) return;
 
             try {
                 const res = await fetch('/college/api/pending-faculty/bulk-approve', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userIds })
+                    body: JSON.stringify({ requests: requestsToVerify })
                 });
 
                 const data = await res.json();
@@ -1575,34 +1616,58 @@
             }
         }
 
-        async function handleRequest(id, action) {
+        async function handleRequest(requestMetaEncoded, action) {
+            const requestMeta = decodeRequestMeta(requestMetaEncoded);
+            if (!requestMeta || !requestMeta.id) {
+                alert('Request metadata is invalid.');
+                return;
+            }
             if (!confirm(`Are you sure you want to ${action} this request?`)) return;
             try {
-                const res = await fetch(`/college/api/pending-faculty/${id}/${action}`, { method: 'POST' });
+                const res = await fetch(`/college/api/pending-faculty/${requestMeta.id}/${action}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestMeta)
+                });
                 const data = await res.json();
                 if (data.success) fetchData(); else alert(data.message || `Failed to ${action} request.`);
             } catch (err) { console.error(err); }
         }
 
-        async function verifyRequest(id) {
+        async function verifyRequest(requestMetaEncoded) {
+            const requestMeta = decodeRequestMeta(requestMetaEncoded);
+            if (!requestMeta || !requestMeta.id) {
+                alert('Request metadata is invalid.');
+                return;
+            }
             if (!confirm(`Are you sure you want to verify this user?`)) return;
             try {
-                const res = await fetch(`/college/api/pending-faculty/${id}/approve`, { method: 'POST' });
+                const res = await fetch(`/college/api/pending-faculty/${requestMeta.id}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestMeta)
+                });
                 const data = await res.json();
                 if (data.success) fetchData(); else alert(data.message || "Failed to approve.");
             } catch (err) { console.error(err); }
         }
 
         async function toggleHOD(id, currentStatus) {
-            const action = currentStatus ? "remove" : "make";
+            const normalizedStatus = isTruthyOne(currentStatus) ? 1 : 0;
+            const action = normalizedStatus ? "remove" : "make";
             if (!confirm(`Are you sure you want to ${action} this user as HOD?`)) return;
             try {
                 const res = await fetch(`/college/api/faculty/${id}/hod`, {
                     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ is_hod: currentStatus ? 0 : 1 })
+                    body: JSON.stringify({ is_hod: normalizedStatus ? 0 : 1 })
                 });
                 const data = await res.json();
-                if (data.success) fetchData(); else alert(data.error || data.message || "Failed to update HOD status.");
+                if (data.success) {
+                    alert(data.message || 'HOD status updated successfully.');
+                    fetchData();
+                } else {
+                    alert(data.error || data.message || "Failed to update HOD status.");
+                }
             } catch (err) { console.error(err); }
         }
 
@@ -1621,7 +1686,7 @@
                 exportData = users.filter(u => u.type === 'faculty').map(u => ({
                     ID: u.id, Name: u.fullName, Email: u.email,
                     Program: u.program, Branch: u.branch,
-                    Is_HOD: u.is_hod === 1 ? 'Yes' : 'No',
+                    Is_HOD: isTruthyOne(u.is_hod) ? 'Yes' : 'No',
                     Contests_Created: u.contests_created, Problems_Created: u.problems_created,
                     Rating: u.rating, Status: u.status
                 }));
