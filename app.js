@@ -159,7 +159,7 @@ app.get('/favicon.ico', (req, res) => res.status(204).end());
 // ==========================================
 // 5. START SERVER
 // ==========================================
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`👉 SuperAdmin Login: super@campuscode.com / super123`);
     console.log(`📁 Make sure your new folder structure (routes/, views/) is in place!`);
